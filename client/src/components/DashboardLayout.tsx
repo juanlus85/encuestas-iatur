@@ -22,7 +22,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   BarChart3,
@@ -92,38 +91,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading) return <DashboardLayoutSkeleton />;
 
   if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-sm w-full">
-          {/* IATUR Logo */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-16 h-16 rounded-xl bg-primary flex items-center justify-center shadow-lg">
-              <span className="text-primary-foreground font-bold text-2xl tracking-tight">IA</span>
-            </div>
-            <div className="text-center">
-              <h1 className="text-xl font-bold text-foreground">IATUR Encuestas</h1>
-              <p className="text-sm text-muted-foreground mt-1">Sistema de Trabajo de Campo</p>
-            </div>
-          </div>
-          <div className="w-full h-px bg-border" />
-          <div className="flex flex-col items-center gap-2 text-center">
-            <p className="text-sm text-muted-foreground">
-              Acceso restringido. Identifíquese para continuar.
-            </p>
-          </div>
-          <Button
-            onClick={() => { window.location.href = getLoginUrl(); }}
-            size="lg"
-            className="w-full"
-          >
-            Iniciar Sesión
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Universidad de Sevilla · IATUR · Barrio de Santa Cruz
-          </p>
-        </div>
-      </div>
-    );
+    // Redirect to dedicated login page
+    window.location.replace("/login");
+    return null;
   }
 
   return (

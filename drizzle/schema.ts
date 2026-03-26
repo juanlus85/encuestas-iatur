@@ -20,6 +20,9 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["admin", "encuestador", "revisor", "user"]).default("user").notNull(),
+  // Login propio (username + password)
+  username: varchar("username", { length: 64 }).unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }),
   // Encuestador-specific fields
   identifier: varchar("identifier", { length: 32 }), // e.g. ENC-01
   isActive: boolean("isActive").default(true).notNull(),

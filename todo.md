@@ -65,3 +65,11 @@
 - [x] Diseño responsive: tablet (10-11"), móvil, escritorio
 - [x] Indicador de versión en pie de página (Versión v1.0. DD/MM/YYYY)
 - [x] Tests vitest (6 tests pasando)
+
+## Login propio con usuario y contraseña
+- [x] Ampliar tabla users con campos username y passwordHash
+- [x] Endpoint POST /api/auth/login (username + password → cookie de sesión)
+- [x] Endpoint POST /api/auth/logout propio (reutiliza el de OAuth)
+- [x] Pantalla de login con formulario usuario/contraseña
+- [x] Gestión de contraseña en panel de usuarios (crear/cambiar)
+- [x] Tests del sistema de login (3 tests: hash, verify, salting)

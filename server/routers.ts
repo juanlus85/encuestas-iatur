@@ -30,8 +30,10 @@ import {
   updateQuestion,
   updateSurveyTemplate,
   updateUser,
+  updateUserPassword,
   upsertFieldMetric,
 } from "./db";
+import { hashPassword } from "./_core/localAuth";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 
@@ -79,10 +81,18 @@ export const appRouter = router({
         role: z.enum(["admin", "encuestador", "revisor"]),
         identifier: z.string().optional(),
         openId: z.string(),
+        // Optional local login credentials
+        username: z.string().min(3).max(64).optional(),
+        password: z.string().min(6).optional(),
       }))
       .mutation(async ({ input }) => {
+        const { password, ...rest } = input;
+        const passwordHash = password ? await hashPassword(password) : undefined;
+        const username = rest.username ? rest.username.trim().toLowerCase() : undefined;
         await createUser({
-          ...input,
+          ...rest,
+          username,
+          passwordHash,
           loginMethod: "manual",
           lastSignedIn: new Date(),
         });
@@ -96,10 +106,25 @@ export const appRouter = router({
         role: z.enum(["admin", "encuestador", "revisor", "user"]).optional(),
         identifier: z.string().optional(),
         isActive: z.boolean().optional(),
+        username: z.string().min(3).max(64).optional(),
       }))
       .mutation(async ({ input }) => {
-        const { id, ...data } = input;
-        await updateUser(id, data);
+        const { id, username, ...data } = input;
+        const updateData: Record<string, unknown> = { ...data };
+        if (username !== undefined) updateData.username = username.trim().toLowerCase();
+        await updateUser(id, updateData);
+        return { success: true };
+      }),
+
+    // Set or reset a user's password (admin only)
+    setPassword: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+      }))
+      .mutation(async ({ input }) => {
+        const hash = await hashPassword(input.password);
+        await updateUserPassword(input.id, hash);
         return { success: true };
       }),
   }),

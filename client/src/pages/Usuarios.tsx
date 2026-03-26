@@ -9,9 +9,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { nanoid } from "nanoid";
-import { Loader2, Plus, Shield, User, UserCheck } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Loader2, Plus, Shield, User, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -28,6 +30,84 @@ const ROLE_ICONS: Record<string, any> = {
   revisor: User,
   user: User,
 };
+
+// ─── Set Password Dialog ──────────────────────────────────────────────────────
+
+function SetPasswordDialog({ userId, userName }: { userId: number; userName: string }) {
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPw, setShowPw] = useState(false);
+
+  const setPasswordMutation = trpc.users.setPassword.useMutation({
+    onSuccess: () => {
+      setOpen(false);
+      setPassword("");
+      setConfirm("");
+      toast.success(`Contraseña actualizada para ${userName}`);
+    },
+    onError: (e) => toast.error(e.message ?? "Error al cambiar contraseña"),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 6) { toast.error("Mínimo 6 caracteres"); return; }
+    if (password !== confirm) { toast.error("Las contraseñas no coinciden"); return; }
+    setPasswordMutation.mutate({ id: userId, password });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="text-xs gap-1.5">
+          <KeyRound className="h-3.5 w-3.5" />
+          Contraseña
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Cambiar contraseña</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground -mt-2">Usuario: <strong>{userName}</strong></p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Nueva contraseña</Label>
+            <div className="relative">
+              <Input
+                type={showPw ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className="pr-10"
+              />
+              <button type="button" onClick={() => setShowPw(!showPw)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Confirmar contraseña</Label>
+            <Input
+              type={showPw ? "text" : "password"}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Repita la contraseña"
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1">Cancelar</Button>
+            <Button type="submit" className="flex-1" disabled={setPasswordMutation.isPending}>
+              {setPasswordMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── User Card ────────────────────────────────────────────────────────────────
 
 function UserCard({ user, onUpdate }: { user: any; onUpdate: () => void }) {
   const updateMutation = trpc.users.update.useMutation({
@@ -53,9 +133,16 @@ function UserCard({ user, onUpdate }: { user: any; onUpdate: () => void }) {
           )}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">{ROLE_LABELS[user.role] ?? user.role}</p>
+        {user.username && (
+          <p className="text-xs text-muted-foreground font-mono">
+            Usuario: <span className="text-foreground">{user.username}</span>
+            {user.passwordHash ? " · ✓ Contraseña configurada" : " · ⚠ Sin contraseña"}
+          </p>
+        )}
         {user.email && <p className="text-xs text-muted-foreground">{user.email}</p>}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+        <SetPasswordDialog userId={user.id} userName={user.name ?? user.username ?? "Usuario"} />
         <Button
           variant="outline"
           size="sm"
@@ -70,32 +157,43 @@ function UserCard({ user, onUpdate }: { user: any; onUpdate: () => void }) {
   );
 }
 
+// ─── Create User Dialog ───────────────────────────────────────────────────────
+
 function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
     role: "encuestador" as "admin" | "encuestador" | "revisor",
     identifier: "",
     openId: "",
+    username: "",
+    password: "",
   });
 
   const createMutation = trpc.users.create.useMutation({
     onSuccess: () => {
       setOpen(false);
-      setForm({ name: "", email: "", role: "encuestador", identifier: "", openId: "" });
+      setForm({ name: "", email: "", role: "encuestador", identifier: "", openId: "", username: "", password: "" });
       onCreated();
       toast.success("Usuario creado correctamente");
     },
-    onError: () => toast.error("Error al crear usuario"),
+    onError: (e) => toast.error(e.message ?? "Error al crear usuario"),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return;
+    if (form.username && form.password && form.password.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
     createMutation.mutate({
       ...form,
       openId: form.openId || `manual-${nanoid(12)}`,
+      username: form.username.trim().toLowerCase() || undefined,
+      password: form.password || undefined,
     });
   };
 
@@ -113,18 +211,17 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
-            <label className="text-sm font-medium block mb-1.5">Nombre completo *</label>
-            <input
-              type="text"
+            <Label className="mb-1.5 block">Nombre completo *</Label>
+            <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
               placeholder="Ej: María García López"
             />
           </div>
+
           <div>
-            <label className="text-sm font-medium block mb-1.5">Rol *</label>
+            <Label className="mb-1.5 block">Rol *</Label>
             <select
               value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value as any })}
@@ -135,28 +232,65 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
               <option value="admin">Administrador</option>
             </select>
           </div>
+
           {form.role === "encuestador" && (
             <div>
-              <label className="text-sm font-medium block mb-1.5">Identificador</label>
-              <input
-                type="text"
+              <Label className="mb-1.5 block">Identificador de campo</Label>
+              <Input
                 value={form.identifier}
                 onChange={(e) => setForm({ ...form, identifier: e.target.value })}
-                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                className="font-mono"
                 placeholder="Ej: ENC-01"
               />
             </div>
           )}
+
+          {/* Separator for credentials */}
+          <div className="border-t border-border pt-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Credenciales de acceso (opcional)
+            </p>
+            <div className="space-y-3">
+              <div>
+                <Label className="mb-1.5 block">Nombre de usuario</Label>
+                <Input
+                  value={form.username}
+                  onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  placeholder="Ej: maria.garcia"
+                />
+                <p className="text-xs text-muted-foreground mt-1">El encuestador usará esto para iniciar sesión</p>
+              </div>
+              <div>
+                <Label className="mb-1.5 block">Contraseña</Label>
+                <div className="relative">
+                  <Input
+                    type={showPw ? "text" : "password"}
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    placeholder="Mínimo 6 caracteres"
+                    className="pr-10"
+                  />
+                  <button type="button" onClick={() => setShowPw(!showPw)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div>
-            <label className="text-sm font-medium block mb-1.5">Email</label>
-            <input
+            <Label className="mb-1.5 block">Email</Label>
+            <Input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
               placeholder="correo@ejemplo.com"
             />
           </div>
+
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1">
               Cancelar
@@ -170,6 +304,8 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
     </Dialog>
   );
 }
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Usuarios() {
   const { user: currentUser } = useAuth();
@@ -198,63 +334,82 @@ export default function Usuarios() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Gestión de Usuarios</h1>
-            <p className="text-muted-foreground text-sm mt-1">{users.length} usuarios registrados</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              Administre encuestadores, revisores y administradores del sistema.
+            </p>
           </div>
           <CreateUserDialog onCreated={refresh} />
         </div>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        {/* Info box */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <p className="text-sm text-blue-800 font-medium">Acceso con usuario y contraseña</p>
+          <p className="text-xs text-blue-700 mt-1">
+            Al crear un usuario, puede asignarle un <strong>nombre de usuario</strong> y <strong>contraseña</strong> para que acceda directamente desde la pantalla de login sin necesidad de cuenta Manus. Puede cambiar la contraseña en cualquier momento con el botón <strong>Contraseña</strong>.
+          </p>
+        </div>
+
+        {isLoading && (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Encuestadores */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <UserCheck className="h-4 w-4 text-primary" />
-                  Encuestadores ({encuestadores.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {encuestadores.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No hay encuestadores registrados.</p>
-                ) : (
-                  encuestadores.map((u) => <UserCard key={u.id} user={u} onUpdate={refresh} />)
-                )}
-              </CardContent>
-            </Card>
+        )}
 
-            {/* Revisores */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <User className="h-4 w-4 text-primary" />
-                  Revisores ({revisores.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {revisores.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No hay revisores registrados.</p>
-                ) : (
-                  revisores.map((u) => <UserCard key={u.id} user={u} onUpdate={refresh} />)
-                )}
-              </CardContent>
-            </Card>
+        {/* Encuestadores */}
+        {encuestadores.length > 0 && (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-primary" />
+                Encuestadores ({encuestadores.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {encuestadores.map((u) => (
+                <UserCard key={u.id} user={u} onUpdate={refresh} />
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
-            {/* Admins */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-primary" />
-                  Administradores ({admins.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {admins.map((u) => <UserCard key={u.id} user={u} onUpdate={refresh} />)}
-              </CardContent>
-            </Card>
+        {/* Revisores */}
+        {revisores.length > 0 && (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                Revisores ({revisores.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {revisores.map((u) => (
+                <UserCard key={u.id} user={u} onUpdate={refresh} />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Admins */}
+        {admins.length > 0 && (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shield className="h-4 w-4 text-primary" />
+                Administradores ({admins.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {admins.map((u) => (
+                <UserCard key={u.id} user={u} onUpdate={refresh} />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {!isLoading && users.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <User className="h-10 w-10 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No hay usuarios creados. Cree el primer encuestador.</p>
           </div>
         )}
       </div>

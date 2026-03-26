@@ -15,6 +15,13 @@
       "when": 1774483664006,
       "tag": "0001_huge_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1774485055790,
+      "tag": "0002_blushing_la_nuit",
+      "breakpoints": true
     }
   ]
 }

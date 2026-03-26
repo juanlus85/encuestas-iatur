@@ -299,22 +299,8 @@ export default function Home() {
   if (loading) return null;
 
   if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-6 p-8 max-w-sm w-full">
-          <div className="w-16 h-16 rounded-xl bg-primary flex items-center justify-center shadow-lg">
-            <span className="text-primary-foreground font-bold text-2xl">IA</span>
-          </div>
-          <div className="text-center">
-            <h1 className="text-xl font-bold">IATUR Encuestas</h1>
-            <p className="text-sm text-muted-foreground mt-1">Sistema de Trabajo de Campo</p>
-          </div>
-          <Button onClick={() => { window.location.href = getLoginUrl(); }} size="lg" className="w-full">
-            Iniciar Sesión
-          </Button>
-        </div>
-      </div>
-    );
+    window.location.replace("/login");
+    return null;
   }
 
   if (user.role === "encuestador") return <EncuestadorHome />;
