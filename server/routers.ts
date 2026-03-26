@@ -1,28 +1,415 @@
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import {
+  createPhoto,
+  createQuestion,
+  createSurveyResponse,
+  createSurveyTemplate,
+  createUser,
+  deleteQuestion,
+  getActiveSurveyTemplates,
+  getAllUsers,
+  getDashboardStats,
+  getEncuestadores,
+  getFieldMetrics,
+  getGpsLocations,
+  getPhotosByResponse,
+  getQuestionsByTemplate,
+  getResponsesByDay,
+  getResponsesByEncuestador,
+  getResponsesByTimeSlot,
+  getSurveyResponseById,
+  getSurveyResponses,
+  getSurveyResponsesByEncuestador,
+  getSurveyTemplateById,
+  getSurveyTemplates,
+  updateQuestion,
+  updateSurveyTemplate,
+  updateUser,
+  upsertFieldMetric,
+} from "./db";
+import { storagePut } from "./storage";
+import { nanoid } from "nanoid";
+
+// ─── Middleware helpers ───────────────────────────────────────────────────────
+
+const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Solo administradores" });
+  return next({ ctx });
+});
+
+const adminOrRevisorProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.user.role !== "admin" && ctx.user.role !== "revisor") throw new TRPCError({ code: "FORBIDDEN", message: "Acceso restringido" });
+  return next({ ctx });
+});
+
+const encuestadorProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!["admin", "encuestador"].includes(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo encuestadores" });
+  return next({ ctx });
+});
+
+// ─── App Router ───────────────────────────────────────────────────────────────
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true } as const;
     }),
   }),
 
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  // ─── Users ─────────────────────────────────────────────────────────────────
+
+  users: router({
+    list: adminProcedure.query(() => getAllUsers()),
+    encuestadores: protectedProcedure.query(() => getEncuestadores()),
+
+    create: adminProcedure
+      .input(z.object({
+        name: z.string().min(2),
+        email: z.string().email().optional(),
+        role: z.enum(["admin", "encuestador", "revisor"]),
+        identifier: z.string().optional(),
+        openId: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        await createUser({
+          ...input,
+          loginMethod: "manual",
+          lastSignedIn: new Date(),
+        });
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        role: z.enum(["admin", "encuestador", "revisor", "user"]).optional(),
+        identifier: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await updateUser(id, data);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Survey Templates ───────────────────────────────────────────────────────
+
+  templates: router({
+    list: protectedProcedure.query(() => getSurveyTemplates()),
+    active: protectedProcedure.query(() => getActiveSurveyTemplates()),
+
+    byId: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const template = await getSurveyTemplateById(input.id);
+        if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+        const qs = await getQuestionsByTemplate(input.id);
+        return { ...template, questions: qs };
+      }),
+
+    create: adminProcedure
+      .input(z.object({
+        name: z.string().min(2),
+        nameEn: z.string().optional(),
+        type: z.enum(["residentes", "visitantes"]),
+        description: z.string().optional(),
+        descriptionEn: z.string().optional(),
+        targetCount: z.number().default(0),
+      }))
+      .mutation(async ({ input }) => {
+        await createSurveyTemplate(input);
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        nameEn: z.string().optional(),
+        type: z.enum(["residentes", "visitantes"]).optional(),
+        description: z.string().optional(),
+        descriptionEn: z.string().optional(),
+        targetCount: z.number().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await updateSurveyTemplate(id, data);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Questions ──────────────────────────────────────────────────────────────
+
+  questions: router({
+    byTemplate: protectedProcedure
+      .input(z.object({ templateId: z.number() }))
+      .query(({ input }) => getQuestionsByTemplate(input.templateId)),
+
+    create: adminProcedure
+      .input(z.object({
+        templateId: z.number(),
+        order: z.number(),
+        type: z.enum(["single_choice", "multiple_choice", "text", "scale", "yes_no", "number"]),
+        text: z.string().min(1),
+        textEn: z.string().optional(),
+        options: z.array(z.object({ value: z.string(), label: z.string(), labelEn: z.string().optional() })).optional(),
+        isRequired: z.boolean().default(true),
+        requiresPhoto: z.boolean().default(false),
+      }))
+      .mutation(async ({ input }) => {
+        await createQuestion(input as any);
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        order: z.number().optional(),
+        text: z.string().optional(),
+        textEn: z.string().optional(),
+        options: z.any().optional(),
+        isRequired: z.boolean().optional(),
+        requiresPhoto: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await updateQuestion(id, data);
+        return { success: true };
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteQuestion(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Survey Responses ───────────────────────────────────────────────────────
+
+  responses: router({
+    submit: encuestadorProcedure
+      .input(z.object({
+        templateId: z.number(),
+        surveyPoint: z.string().optional(),
+        timeSlot: z.enum(["manana", "tarde", "noche", "fin_semana"]).optional(),
+        latitude: z.number().optional(),
+        longitude: z.number().optional(),
+        gpsAccuracy: z.number().optional(),
+        startedAt: z.date(),
+        finishedAt: z.date().optional(),
+        language: z.enum(["es", "en"]).default("es"),
+        answers: z.array(z.object({ questionId: z.number(), answer: z.any() })),
+        status: z.enum(["completa", "incompleta", "rechazada", "sustitucion"]).default("completa"),
+        deviceInfo: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const result = await createSurveyResponse({
+          ...input,
+          encuestadorId: ctx.user.id,
+          encuestadorName: ctx.user.name ?? "",
+          encuestadorIdentifier: ctx.user.identifier ?? "",
+          latitude: input.latitude?.toString(),
+          longitude: input.longitude?.toString(),
+          gpsAccuracy: input.gpsAccuracy?.toString(),
+          answers: input.answers,
+          finishedAt: input.finishedAt ?? new Date(),
+        });
+        return { success: true, id: result?.insertId };
+      }),
+
+    list: adminOrRevisorProcedure
+      .input(z.object({
+        encuestadorId: z.number().optional(),
+        templateId: z.number().optional(),
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+        status: z.string().optional(),
+      }).optional())
+      .query(({ input }) => getSurveyResponses(input)),
+
+    myList: encuestadorProcedure
+      .query(({ ctx }) => getSurveyResponsesByEncuestador(ctx.user.id)),
+
+    byId: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const response = await getSurveyResponseById(input.id);
+        if (!response) throw new TRPCError({ code: "NOT_FOUND" });
+        const responsePhotos = await getPhotosByResponse(input.id);
+        return { ...response, photos: responsePhotos };
+      }),
+  }),
+
+  // ─── Photos ─────────────────────────────────────────────────────────────────
+
+  photos: router({
+    upload: encuestadorProcedure
+      .input(z.object({
+        responseId: z.number(),
+        questionId: z.number().optional(),
+        base64: z.string(), // base64 encoded image
+        mimeType: z.string().default("image/jpeg"),
+        sizeBytes: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const suffix = nanoid(8);
+        const ext = input.mimeType === "image/png" ? "png" : "jpg";
+        const fileKey = `encuestas/photos/${input.responseId}/${suffix}.${ext}`;
+        const buffer = Buffer.from(input.base64, "base64");
+        const { url } = await storagePut(fileKey, buffer, input.mimeType);
+        await createPhoto({
+          responseId: input.responseId,
+          questionId: input.questionId,
+          fileKey,
+          url,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+        });
+        return { success: true, url };
+      }),
+  }),
+
+  // ─── Field Metrics ──────────────────────────────────────────────────────────
+
+  fieldMetrics: router({
+    upsert: encuestadorProcedure
+      .input(z.object({
+        date: z.string(),
+        templateId: z.number().optional(),
+        surveyPoint: z.string().optional(),
+        timeSlot: z.enum(["manana", "tarde", "noche", "fin_semana"]).optional(),
+        completed: z.number().default(0),
+        rejected: z.number().default(0),
+        substituted: z.number().default(0),
+        incomplete: z.number().default(0),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await upsertFieldMetric({ ...input, encuestadorId: ctx.user.id });
+        return { success: true };
+      }),
+
+    list: adminOrRevisorProcedure
+      .input(z.object({
+        encuestadorId: z.number().optional(),
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+      }).optional())
+      .query(({ input }) => getFieldMetrics(input ? {
+        encuestadorId: input.encuestadorId,
+        dateFrom: input.dateFrom?.toISOString().split('T')[0],
+        dateTo: input.dateTo?.toISOString().split('T')[0],
+      } : undefined)),
+  }),
+
+  // ─── Dashboard ──────────────────────────────────────────────────────────────
+
+  dashboard: router({
+    stats: adminOrRevisorProcedure
+      .input(z.object({
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+        encuestadorId: z.number().optional(),
+      }).optional())
+      .query(({ input }) => getDashboardStats(input)),
+
+    byDay: adminOrRevisorProcedure
+      .input(z.object({ dateFrom: z.date().optional(), dateTo: z.date().optional() }).optional())
+      .query(({ input }) => getResponsesByDay(input)),
+
+    byEncuestador: adminOrRevisorProcedure
+      .input(z.object({ dateFrom: z.date().optional(), dateTo: z.date().optional() }).optional())
+      .query(({ input }) => getResponsesByEncuestador(input)),
+
+    byTimeSlot: adminOrRevisorProcedure
+      .input(z.object({ dateFrom: z.date().optional(), dateTo: z.date().optional() }).optional())
+      .query(({ input }) => getResponsesByTimeSlot(input)),
+
+    byStatus: adminOrRevisorProcedure
+      .input(z.object({ dateFrom: z.date().optional(), dateTo: z.date().optional() }).optional())
+      .query(async ({ input }) => {
+        const { getDb } = await import('./db');
+        const { surveyResponses } = await import('../drizzle/schema');
+        const { sql, and, gte, lte } = await import('drizzle-orm');
+        const db = await getDb();
+        if (!db) return [];
+        const conditions = [];
+        if (input?.dateFrom) conditions.push(gte(surveyResponses.startedAt, input.dateFrom));
+        if (input?.dateTo) conditions.push(lte(surveyResponses.startedAt, input.dateTo));
+        const rows = await db
+          .select({ status: surveyResponses.status, count: sql<number>`count(*)` })
+          .from(surveyResponses)
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
+          .groupBy(surveyResponses.status);
+        return rows;
+      }),
+
+    gpsLocations: adminOrRevisorProcedure
+      .input(z.object({
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+        encuestadorId: z.number().optional(),
+      }).optional())
+      .query(({ input }) => getGpsLocations(input)),
+  }),
+
+  // ─── Export CSV ─────────────────────────────────────────────────────────────
+
+  export: router({
+    csv: adminOrRevisorProcedure
+      .input(z.object({
+        encuestadorId: z.number().optional(),
+        templateId: z.number().optional(),
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        const responses = await getSurveyResponses(input);
+        const headers = [
+          "ID", "Plantilla", "Encuestador", "Identificador", "Dispositivo",
+          "Punto Encuesta", "Franja", "Latitud", "Longitud", "Precisión GPS",
+          "Inicio", "Fin", "Idioma", "Estado", "Respuestas"
+        ];
+        const rows = responses.map((r) => [
+          r.id,
+          r.templateId,
+          r.encuestadorName ?? "",
+          r.encuestadorIdentifier ?? "",
+          r.deviceInfo ?? "",
+          r.surveyPoint ?? "",
+          r.timeSlot ?? "",
+          r.latitude ?? "",
+          r.longitude ?? "",
+          r.gpsAccuracy ?? "",
+          r.startedAt?.toISOString() ?? "",
+          r.finishedAt?.toISOString() ?? "",
+          r.language,
+          r.status,
+          JSON.stringify(r.answers),
+        ]);
+        // Build CSV string
+        const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const csvLines = [
+          headers.map(escape).join(","),
+          ...rows.map((row) => row.map(escape).join(",")),
+        ];
+        return { csv: csvLines.join("\n"), count: rows.length };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

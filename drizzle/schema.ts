@@ -1,22 +1,28 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+  boolean,
+  decimal,
+  json,
+  bigint,
+} from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
+// ─── Users ───────────────────────────────────────────────────────────────────
+
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["admin", "encuestador", "revisor", "user"]).default("user").notNull(),
+  // Encuestador-specific fields
+  identifier: varchar("identifier", { length: 32 }), // e.g. ENC-01
+  isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -25,4 +31,116 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// ─── Survey Templates ─────────────────────────────────────────────────────────
+
+export const surveyTemplates = mysqlTable("survey_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  nameEn: varchar("nameEn", { length: 255 }),
+  type: mysqlEnum("type", ["residentes", "visitantes"]).notNull(),
+  description: text("description"),
+  descriptionEn: text("descriptionEn"),
+  isActive: boolean("isActive").default(true).notNull(),
+  targetCount: int("targetCount").default(0).notNull(), // e.g. 300 or 400
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SurveyTemplate = typeof surveyTemplates.$inferSelect;
+export type InsertSurveyTemplate = typeof surveyTemplates.$inferInsert;
+
+// ─── Questions ────────────────────────────────────────────────────────────────
+
+export const questions = mysqlTable("questions", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  order: int("order").notNull().default(0),
+  type: mysqlEnum("type", ["single_choice", "multiple_choice", "text", "scale", "yes_no", "number"]).notNull(),
+  text: text("text").notNull(),
+  textEn: text("textEn"),
+  options: json("options"), // Array of {value, label, labelEn}
+  isRequired: boolean("isRequired").default(true).notNull(),
+  requiresPhoto: boolean("requiresPhoto").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Question = typeof questions.$inferSelect;
+export type InsertQuestion = typeof questions.$inferInsert;
+
+// ─── Survey Responses ─────────────────────────────────────────────────────────
+
+export const surveyResponses = mysqlTable("survey_responses", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  encuestadorId: int("encuestadorId").notNull(),
+
+  // Trazabilidad completa
+  encuestadorName: varchar("encuestadorName", { length: 255 }),
+  encuestadorIdentifier: varchar("encuestadorIdentifier", { length: 32 }),
+  deviceInfo: text("deviceInfo"), // user agent
+  surveyPoint: varchar("surveyPoint", { length: 255 }), // punto de encuesta
+  timeSlot: mysqlEnum("timeSlot", ["manana", "tarde", "noche", "fin_semana"]),
+
+  // GPS
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  gpsAccuracy: decimal("gpsAccuracy", { precision: 8, scale: 2 }),
+
+  // Timestamps
+  startedAt: timestamp("startedAt").notNull(),
+  finishedAt: timestamp("finishedAt"),
+
+  // Language
+  language: mysqlEnum("language", ["es", "en"]).default("es").notNull(),
+
+  // Answers: JSON array of {questionId, answer}
+  answers: json("answers").notNull(),
+
+  // Status
+  status: mysqlEnum("status", ["completa", "incompleta", "rechazada", "sustitucion"]).default("completa").notNull(),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SurveyResponse = typeof surveyResponses.$inferSelect;
+export type InsertSurveyResponse = typeof surveyResponses.$inferInsert;
+
+// ─── Photos ───────────────────────────────────────────────────────────────────
+
+export const photos = mysqlTable("photos", {
+  id: int("id").autoincrement().primaryKey(),
+  responseId: int("responseId").notNull(),
+  questionId: int("questionId"),
+  fileKey: varchar("fileKey", { length: 512 }).notNull(),
+  url: text("url").notNull(),
+  mimeType: varchar("mimeType", { length: 64 }).default("image/jpeg"),
+  sizeBytes: bigint("sizeBytes", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Photo = typeof photos.$inferSelect;
+export type InsertPhoto = typeof photos.$inferInsert;
+
+// ─── Field Metrics ────────────────────────────────────────────────────────────
+
+export const fieldMetrics = mysqlTable("field_metrics", {
+  id: int("id").autoincrement().primaryKey(),
+  encuestadorId: int("encuestadorId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  templateId: int("templateId"),
+  surveyPoint: varchar("surveyPoint", { length: 255 }),
+  timeSlot: mysqlEnum("timeSlot", ["manana", "tarde", "noche", "fin_semana"]),
+
+  // Metrics
+  completed: int("completed").default(0).notNull(),
+  rejected: int("rejected").default(0).notNull(),
+  substituted: int("substituted").default(0).notNull(),
+  incomplete: int("incomplete").default(0).notNull(),
+
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FieldMetric = typeof fieldMetrics.$inferSelect;
+export type InsertFieldMetric = typeof fieldMetrics.$inferInsert;

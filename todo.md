@@ -1,0 +1,67 @@
+# IATUR Encuestas - TODO
+
+## Fase 1: Base de datos y servidor
+- [x] Esquema BD: tabla users (roles: admin, encuestador, revisor)
+- [x] Esquema BD: tabla survey_templates (plantillas de encuesta ES/EN)
+- [x] Esquema BD: tabla questions (preguntas por plantilla)
+- [x] Esquema BD: tabla survey_responses (respuestas con trazabilidad completa)
+- [x] Esquema BD: tabla field_metrics (rechazos, sustituciones, partes diarios)
+- [x] Esquema BD: tabla photos (referencias a fotos S3)
+- [x] Migración de BD (pnpm db:push)
+- [x] Router: gestión de usuarios (CRUD admin)
+- [x] Router: plantillas de encuesta (CRUD admin)
+- [x] Router: envío de respuestas (encuestador)
+- [x] Router: consulta de resultados (admin/revisor)
+- [x] Router: estadísticas y agregaciones (dashboard)
+- [x] Router: exportación CSV
+- [x] Router: métricas de campo
+
+## Fase 2: Diseño global y autenticación
+- [x] Paleta corporativa IATUR (azules institucionales, blancos, grises)
+- [x] Tipografía profesional (Inter)
+- [x] Logo IATUR en cabecera
+- [x] Layout con sidebar para admin/revisor
+- [x] Layout mobile-first para encuestador
+- [x] Página de login profesional
+- [x] Gestión de sesión y redirección por rol
+
+## Fase 3: Módulo encuestador (tablet-first)
+- [x] Dashboard encuestador: encuestas activas del día
+- [x] Formulario de encuesta paso a paso
+- [x] Captura GPS automática al iniciar encuesta
+- [x] Registro de hora de inicio y finalización
+- [x] Captura de fotografías con cámara del dispositivo
+- [x] Subida de fotos a S3
+- [x] Soporte bilingüe ES/EN en formulario
+- [x] Historial de encuestas del encuestador
+- [x] Registro de rechazos y sustituciones
+
+## Fase 4: Panel de administración
+- [x] Gestión de usuarios (crear, editar, desactivar encuestadores)
+- [x] Editor de plantillas de encuesta
+- [x] Editor de preguntas (tipos: opción múltiple, texto, escala, sí/no)
+- [x] Listado de respuestas con filtros
+- [x] Visor de respuesta individual con fotos y mapa
+- [x] Partes de campo diarios por encuestador
+
+## Fase 5: Dashboard de estadísticas
+- [x] KPIs: total encuestas, residentes, visitantes, progreso %
+- [x] Gráfico de barras: encuestas por día
+- [x] Gráfico de dona: distribución por tipo (residente/visitante)
+- [x] Gráfico de barras: distribución por encuestador
+- [x] Gráfico de franjas horarias
+- [x] Filtros: rango de fechas, encuestador, tipo
+- [x] Selector de período con período en curso por defecto
+- [x] Mapa interactivo con ubicaciones GPS
+- [x] Mapa de calor de cobertura en Barrio de Santa Cruz
+
+## Fase 6: Exportación y métricas
+- [x] Exportación CSV con todos los metadatos
+- [x] Filtros de exportación: fechas, encuestador, tipo
+- [x] Métricas de campo: tasa de respuesta, rechazos, sustituciones
+- [x] Partes de campo diarios
+
+## Transversal
+- [x] Diseño responsive: tablet (10-11"), móvil, escritorio
+- [x] Indicador de versión en pie de página (Versión v1.0. DD/MM/YYYY)
+- [x] Tests vitest (6 tests pasando)
