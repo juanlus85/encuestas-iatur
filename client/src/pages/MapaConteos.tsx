@@ -1,9 +1,8 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { MapView } from "@/components/Map";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Loader2, PersonStanding, Thermometer, MapPin } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ViewMode = "heatmap" | "markers";
 
@@ -14,6 +13,34 @@ const SURVEY_POINTS = [
   "Pimienta",
   "Mesón del Moro",
 ];
+
+const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
+const FORGE_BASE_URL =
+  import.meta.env.VITE_FRONTEND_FORGE_API_URL || "https://forge.butterfly-effect.dev";
+const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
+
+// Carga el script de Google Maps con la librería visualization incluida
+let mapScriptPromise: Promise<void> | null = null;
+function loadMapScript(): Promise<void> {
+  if (mapScriptPromise) return mapScriptPromise;
+  // Si ya está cargado, resolver inmediatamente
+  if (typeof window !== "undefined" && (window as any).google?.maps?.visualization) {
+    return Promise.resolve();
+  }
+  mapScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry,visualization`;
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.onload = () => resolve();
+    script.onerror = () => {
+      mapScriptPromise = null;
+      reject(new Error("Failed to load Google Maps"));
+    };
+    document.head.appendChild(script);
+  });
+  return mapScriptPromise;
+}
 
 function HeatmapLegend() {
   return (
@@ -40,6 +67,9 @@ export default function MapaConteos() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [surveyPoint, setSurveyPoint] = useState("");
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   const { data: passes = [], isLoading } = trpc.passes.list.useQuery({
     dateFrom: dateFrom || undefined,
@@ -51,79 +81,118 @@ export default function MapaConteos() {
     (p) => p.latitude != null && p.longitude != null
   );
 
-  const totalPersonas = validPasses.reduce((sum: number, p: any) => sum + (p.count ?? 1), 0);
+  const totalPersonas = validPasses.reduce((sum: number, p: any) => sum + (Number(p.count) ?? 1), 0);
 
-  const handleMapReady = (map: google.maps.Map) => {
-    const center = { lat: 37.3861, lng: -5.9915 };
-    map.setCenter(center);
-    map.setZoom(17);
+  // Inicializar el mapa y dibujar los datos cuando tengamos tanto el mapa como los datos
+  useEffect(() => {
+    if (isLoading) return;
+    if (validPasses.length === 0) return;
+    if (!mapContainerRef.current) return;
 
-    if (mode === "heatmap") {
-      // Cada pase tiene peso = count (número de personas)
-      const heatmapData = validPasses.map((p: any) =>
-        ({
-          location: new google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
-          weight: Math.max(1, p.count ?? 1),
-        })
-      );
+    let cancelled = false;
 
-      new (google.maps as any).visualization.HeatmapLayer({
-        data: heatmapData,
-        map,
-        radius: 30,
-        opacity: 0.75,
-        gradient: [
-          "rgba(0, 255, 255, 0)",
-          "rgba(0, 255, 255, 1)",
-          "rgba(0, 191, 255, 1)",
-          "rgba(0, 127, 255, 1)",
-          "rgba(0, 63, 255, 1)",
-          "rgba(0, 0, 255, 1)",
-          "rgba(0, 0, 223, 1)",
-          "rgba(0, 0, 191, 1)",
-          "rgba(0, 0, 159, 1)",
-          "rgba(0, 0, 127, 1)",
-          "rgba(63, 0, 91, 1)",
-          "rgba(127, 0, 63, 1)",
-          "rgba(191, 0, 31, 1)",
-          "rgba(255, 0, 0, 1)",
-        ],
+    loadMapScript()
+      .then(() => {
+        if (cancelled || !mapContainerRef.current) return;
+
+        // Crear o reutilizar el mapa
+        if (!mapInstanceRef.current) {
+          mapInstanceRef.current = new window.google.maps.Map(mapContainerRef.current, {
+            zoom: 17,
+            center: { lat: 37.3861, lng: -5.9915 },
+            mapTypeControl: true,
+            fullscreenControl: true,
+            zoomControl: true,
+            streetViewControl: false,
+            mapId: "DEMO_MAP_ID",
+          });
+        } else {
+          // Limpiar capas anteriores recreando el mapa en el mismo contenedor
+          mapInstanceRef.current = new window.google.maps.Map(mapContainerRef.current, {
+            zoom: 17,
+            center: { lat: 37.3861, lng: -5.9915 },
+            mapTypeControl: true,
+            fullscreenControl: true,
+            zoomControl: true,
+            streetViewControl: false,
+            mapId: "DEMO_MAP_ID",
+          });
+        }
+
+        const map = mapInstanceRef.current;
+
+        if (mode === "heatmap") {
+          const heatmapData = validPasses.map((p: any) => ({
+            location: new window.google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
+            weight: Math.max(1, Number(p.count) ?? 1),
+          }));
+
+          new (window.google.maps as any).visualization.HeatmapLayer({
+            data: heatmapData,
+            map,
+            radius: 35,
+            opacity: 0.8,
+            gradient: [
+              "rgba(0, 255, 255, 0)",
+              "rgba(0, 255, 255, 1)",
+              "rgba(0, 191, 255, 1)",
+              "rgba(0, 127, 255, 1)",
+              "rgba(0, 63, 255, 1)",
+              "rgba(0, 0, 255, 1)",
+              "rgba(0, 0, 223, 1)",
+              "rgba(0, 0, 191, 1)",
+              "rgba(0, 0, 159, 1)",
+              "rgba(0, 0, 127, 1)",
+              "rgba(63, 0, 91, 1)",
+              "rgba(127, 0, 63, 1)",
+              "rgba(191, 0, 31, 1)",
+              "rgba(255, 0, 0, 1)",
+            ],
+          });
+        } else {
+          // Marcadores con tamaño proporcional al count
+          validPasses.forEach((p: any) => {
+            const scale = Math.max(8, Math.min(24, 8 + Math.sqrt(Number(p.count) ?? 1) * 2));
+            const marker = new window.google.maps.Marker({
+              position: { lat: Number(p.latitude), lng: Number(p.longitude) },
+              map,
+              title: `${p.count} persona(s) · ${p.directionLabel ?? "Sin sentido"}`,
+              icon: {
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale,
+                fillColor: "#f59e0b",
+                fillOpacity: 0.85,
+                strokeColor: "#ffffff",
+                strokeWeight: 2,
+              },
+            });
+
+            const infoWindow = new window.google.maps.InfoWindow({
+              content: `
+                <div style="font-family: Inter, sans-serif; padding: 4px; min-width: 180px;">
+                  <p style="font-weight: 600; margin: 0 0 4px 0; font-size: 13px;">${p.count} persona(s)</p>
+                  <p style="margin: 0; font-size: 12px; color: #666;">Punto: ${p.surveyPoint}</p>
+                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Sentido: ${p.directionLabel ?? "—"}</p>
+                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Encuestador: ${p.encuestadorName ?? "—"}</p>
+                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Fecha: ${new Date(p.recordedAt).toLocaleDateString("es-ES")}</p>
+                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Hora: ${new Date(p.recordedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
+                </div>
+              `,
+            });
+
+            marker.addListener("click", () => infoWindow.open(map, marker));
+          });
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setMapError("No se pudo cargar el mapa. Comprueba la conexión.");
+        console.error(err);
       });
-    } else {
-      // Marcadores con tamaño proporcional al count
-      validPasses.forEach((p: any) => {
-        const scale = Math.max(6, Math.min(20, 6 + Math.sqrt(p.count ?? 1) * 2));
-        const marker = new google.maps.Marker({
-          position: { lat: Number(p.latitude), lng: Number(p.longitude) },
-          map,
-          title: `${p.count} persona(s) · ${p.directionLabel ?? "Sin sentido"} · ${p.surveyPoint}`,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale,
-            fillColor: "#f59e0b",
-            fillOpacity: 0.8,
-            strokeColor: "#ffffff",
-            strokeWeight: 2,
-          },
-        });
 
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div style="font-family: Inter, sans-serif; padding: 4px; min-width: 180px;">
-              <p style="font-weight: 600; margin: 0 0 4px 0; font-size: 13px;">${p.count} persona(s)</p>
-              <p style="margin: 0; font-size: 12px; color: #666;">Punto: ${p.surveyPoint}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Sentido: ${p.directionLabel ?? "—"}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Encuestador: ${p.encuestadorName ?? "—"}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Fecha: ${new Date(p.recordedAt).toLocaleDateString("es-ES")}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Hora: ${new Date(p.recordedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
-            </div>
-          `,
-        });
-
-        marker.addListener("click", () => infoWindow.open(map, marker));
-      });
-    }
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, validPasses.length, mode, dateFrom, dateTo, surveyPoint]);
 
   return (
     <DashboardLayout>
@@ -133,7 +202,7 @@ export default function MapaConteos() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Mapa de Calor · Conteos Peatonales</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              {validPasses.length} pases registrados · {totalPersonas.toLocaleString("es-ES")} personas en total
+              {isLoading ? "Cargando..." : `${validPasses.length} pases con GPS · ${totalPersonas.toLocaleString("es-ES")} personas`}
             </p>
           </div>
         </div>
@@ -218,28 +287,34 @@ export default function MapaConteos() {
         {/* Map */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <div className="h-[520px] md:h-[620px] relative">
-            {isLoading ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/30 z-10">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : validPasses.length === 0 ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+            )}
+            {!isLoading && validPasses.length === 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground z-10">
                 <PersonStanding className="h-12 w-12 mb-3 opacity-30" />
-                <p className="text-sm">No hay pases con GPS registrados para el período seleccionado.</p>
+                <p className="text-sm">No hay pases con GPS para el período seleccionado.</p>
                 <p className="text-xs mt-1">Los conteos con GPS capturado aparecerán aquí.</p>
               </div>
-            ) : (
-              <MapView
-                key={`conteos-${mode}-${dateFrom}-${dateTo}-${surveyPoint}`}
-                onMapReady={handleMapReady}
-                className="w-full h-full"
-              />
             )}
+            {mapError && (
+              <div className="absolute inset-0 flex items-center justify-center text-destructive z-10">
+                <p className="text-sm">{mapError}</p>
+              </div>
+            )}
+            {/* El div del mapa siempre está montado para que el ref funcione */}
+            <div
+              ref={mapContainerRef}
+              className="w-full h-full"
+              style={{ display: (!isLoading && validPasses.length > 0 && !mapError) ? "block" : "none" }}
+            />
           </div>
         </Card>
 
         {/* Stats summary */}
-        {validPasses.length > 0 && (
+        {!isLoading && validPasses.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: "Pases con GPS", value: validPasses.length, color: "text-green-600" },

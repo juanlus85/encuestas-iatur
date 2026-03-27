@@ -135,3 +135,6 @@
 
 ## Bug: Pantallas arrancan desplazadas hacia abajo en móvil
 - [x] Corrección global: componente ScrollToTop en App.tsx que resetea window + documentElement + body en cada cambio de ruta
+
+## Bug: Mapa de calor de conteos no muestra datos
+- [x] Corregido: faltaba la librería `visualization` en el script de Google Maps + rediseño del componente para inicializar el mapa después de tener los datos (no antes)
