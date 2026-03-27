@@ -12,12 +12,12 @@ import { useState } from "react";
 export default function ConteoResultados() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [encuestadorId, setEncuestadorId] = useState<string>("");
+  const [encuestadorId, setEncuestadorId] = useState<string>("all");
   const [selectedSession, setSelectedSession] = useState<number | null>(null);
 
   const { data: encuestadores } = trpc.users.encuestadores.useQuery();
   const { data: sessions, isLoading } = trpc.pedestrian.listSessions.useQuery({
-    encuestadorId: encuestadorId ? Number(encuestadorId) : undefined,
+    encuestadorId: encuestadorId && encuestadorId !== "all" ? Number(encuestadorId) : undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
   });
@@ -112,7 +112,7 @@ export default function ConteoResultados() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {encuestadores?.map((e) => (
                     <SelectItem key={e.id} value={String(e.id)}>
                       {e.identifier ? `${e.identifier} — ` : ""}{e.name}

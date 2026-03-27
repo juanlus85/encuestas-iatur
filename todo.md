@@ -97,3 +97,6 @@
 ## Bug: Dashboard muestra 0 encuestas
 - [x] Diagnosticar por qué el dashboard muestra 0 aunque hay respuestas en BD
 - [x] Corregir la consulta/router del dashboard (alias SQL t.type → ${surveyTemplates.type})
+
+## Bug: SelectItem value vacío en /conteo-resultados
+- [x] Corregir SelectItem con value="" en ConteoResultados.tsx (cambiado a value="all")
