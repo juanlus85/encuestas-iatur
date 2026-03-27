@@ -1,0 +1,26 @@
+{
+  "query": "\nSELECT st.id, st.name, st.type, st.targetCount, st.isActive, COUNT(q.id) as num_preguntas\nFROM survey_templates st\nLEFT JOIN questions q ON q.templateId = st.id\nGROUP BY st.id, st.name, st.type, st.targetCount, st.isActive;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user uN1yFnMXg2uz2sS.ecce8a0683a4 --database nHD7C8PRaURA7Ubm8Aop3k --execute \nSELECT st.id, st.name, st.type, st.targetCount, st.isActive, COUNT(q.id) as num_preguntas\nFROM survey_templates st\nLEFT JOIN questions q ON q.templateId = st.id\nGROUP BY st.id, st.name, st.type, st.targetCount, st.isActive;\n",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Residentes",
+      "type": "residentes",
+      "targetCount": "0",
+      "isActive": "1",
+      "num_preguntas": "3"
+    },
+    {
+      "id": "30001",
+      "name": "Encuesta a Residentes - Barrio de Santa Cruz",
+      "type": "residentes",
+      "targetCount": "300",
+      "isActive": "1",
+      "num_preguntas": "29"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttype\ttargetCount\tisActive\tnum_preguntas\n1\tResidentes\tresidentes\t0\t1\t3\n30001\tEncuesta a Residentes - Barrio de Santa Cruz\tresidentes\t300\t1\t29\n",
+  "stderr": "",
+  "execution_time_ms": 78
+}

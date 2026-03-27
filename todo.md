@@ -73,3 +73,11 @@
 - [x] Pantalla de login con formulario usuario/contraseña
 - [x] Gestión de contraseña en panel de usuarios (crear/cambiar)
 - [x] Tests del sistema de login (3 tests: hash, verify, salting)
+
+## Carga de preguntas reales IATUR
+- [x] Plantilla "Encuesta a Residentes" con preguntas P.01-P.13 (29 preguntas, ID 30001)
+
+## Encuesta a Visitantes
+- [ ] Plantilla "Encuesta a Visitantes" con preguntas P1-P15 (cuestionario IATUR)
+- [ ] Metadatos de campo específicos: punto de encuesta, bloque horario, código de ventana, minutos inicio/fin
+- [ ] Cuotas de visitantes: 40 no sevillanos, 180 nacionales, 180 extranjeros

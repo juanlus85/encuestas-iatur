@@ -1,0 +1,31 @@
+{
+  "query": "\nSELECT st.id, st.name, st.type, st.targetCount, COUNT(q.id) as preguntas\nFROM survey_templates st\nLEFT JOIN questions q ON q.templateId = st.id\nWHERE st.isActive = 1\nGROUP BY st.id, st.name, st.type, st.targetCount\nORDER BY st.id;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user uN1yFnMXg2uz2sS.ecce8a0683a4 --database nHD7C8PRaURA7Ubm8Aop3k --execute \nSELECT st.id, st.name, st.type, st.targetCount, COUNT(q.id) as preguntas\nFROM survey_templates st\nLEFT JOIN questions q ON q.templateId = st.id\nWHERE st.isActive = 1\nGROUP BY st.id, st.name, st.type, st.targetCount\nORDER BY st.id;\n",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Residentes",
+      "type": "residentes",
+      "targetCount": "0",
+      "preguntas": "3"
+    },
+    {
+      "id": "30001",
+      "name": "Encuesta a Residentes - Barrio de Santa Cruz",
+      "type": "residentes",
+      "targetCount": "300",
+      "preguntas": "29"
+    },
+    {
+      "id": "30002",
+      "name": "Encuesta a Visitantes - Barrio de Santa Cruz",
+      "type": "visitantes",
+      "targetCount": "400",
+      "preguntas": "21"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttype\ttargetCount\tpreguntas\n1\tResidentes\tresidentes\t0\t3\n30001\tEncuesta a Residentes - Barrio de Santa Cruz\tresidentes\t300\t29\n30002\tEncuesta a Visitantes - Barrio de Santa Cruz\tvisitantes\t400\t21\n",
+  "stderr": "",
+  "execution_time_ms": 152
+}

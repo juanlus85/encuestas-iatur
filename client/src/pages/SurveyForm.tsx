@@ -299,10 +299,16 @@ export default function SurveyForm() {
   const [photos, setPhotos] = useState<PhotoData[]>([]);
   const [surveyPoint, setSurveyPoint] = useState("");
   const [timeSlot, setTimeSlot] = useState<string>("");
+  const [windowCode, setWindowCode] = useState<string>(""); // V1/V2/V3 para visitantes
+  const [startMinute, setStartMinute] = useState<string>("");
+  const [endMinute, setEndMinute] = useState<string>("");
+  const [surveyCode, setSurveyCode] = useState<string>("");
   const [startedAt] = useState(new Date());
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submittedId, setSubmittedId] = useState<number | null>(null);
+
+  const isVisitantes = templateData?.type === "visitantes";
 
   const questions = templateData?.questions ?? [];
   const totalSteps = questions.length;
@@ -349,6 +355,13 @@ export default function SurveyForm() {
         answers,
         status: "completa",
         deviceInfo: navigator.userAgent.substring(0, 200),
+        // Metadatos específicos de visitantes
+        ...(isVisitantes && {
+          windowCode: windowCode || undefined,
+          startMinute: startMinute ? parseInt(startMinute) : undefined,
+          endMinute: endMinute ? parseInt(endMinute) : undefined,
+          surveyCode: surveyCode || undefined,
+        }),
       });
 
       const responseId = result.id as number;
@@ -488,34 +501,58 @@ export default function SurveyForm() {
 
             {/* Survey point */}
             <div>
-              <label className="text-sm font-medium text-foreground block mb-2">Punto de encuesta</label>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Punto de encuesta {isVisitantes && <span className="text-destructive">*</span>}
+              </label>
               <select
                 value={surveyPoint}
                 onChange={(e) => setSurveyPoint(e.target.value)}
                 className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Seleccionar punto...</option>
-                <option value="Plaza del Triunfo">Plaza del Triunfo</option>
-                <option value="Catedral">Catedral</option>
-                <option value="Alcázar">Alcázar</option>
-                <option value="Calle Mateos Gago">Calle Mateos Gago</option>
-                <option value="Plaza de Doña Elvira">Plaza de Doña Elvira</option>
-                <option value="Callejón del Agua">Callejón del Agua</option>
-                <option value="Jardines de Murillo">Jardines de Murillo</option>
-                <option value="Otro">Otro</option>
+                {isVisitantes ? (
+                  <>
+                    <option value="Mateos Gago">Mateos Gago</option>
+                    <option value="Agua/Vida">Agua/Vida</option>
+                    <option value="Plaza de Alfaro">Plaza de Alfaro</option>
+                    <option value="Virgen de los Reyes">Virgen de los Reyes</option>
+                    <option value="Patio de Banderas">Patio de Banderas</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Plaza del Triunfo">Plaza del Triunfo</option>
+                    <option value="Catedral">Catedral</option>
+                    <option value="Alcázar">Alcázar</option>
+                    <option value="Calle Mateos Gago">Calle Mateos Gago</option>
+                    <option value="Plaza de Doña Elvira">Plaza de Doña Elvira</option>
+                    <option value="Callejón del Agua">Callejón del Agua</option>
+                    <option value="Jardines de Murillo">Jardines de Murillo</option>
+                    <option value="Otro">Otro</option>
+                  </>
+                )}
               </select>
             </div>
 
             {/* Time slot */}
             <div>
-              <label className="text-sm font-medium text-foreground block mb-2">Franja horaria</label>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Bloque horario (90 min) {isVisitantes && <span className="text-destructive">*</span>}
+              </label>
               <div className="grid grid-cols-2 gap-2">
-                {[
-                  { val: "manana", label: "Mañana (8-14h)" },
-                  { val: "tarde", label: "Tarde (14-20h)" },
-                  { val: "noche", label: "Noche (20-24h)" },
-                  { val: "fin_semana", label: "Fin de semana" },
-                ].map(({ val, label }) => (
+                {(isVisitantes
+                  ? [
+                      { val: "manana", label: "Mañana (10–12)" },
+                      { val: "mediodia", label: "Mediodía (12–15)" },
+                      { val: "tarde", label: "Tarde (17–20)" },
+                      { val: "noche", label: "Noche (20–23)" },
+                    ]
+                  : [
+                      { val: "manana", label: "Mañana (8–14h)" },
+                      { val: "tarde", label: "Tarde (14–20h)" },
+                      { val: "noche", label: "Noche (20–24h)" },
+                      { val: "fin_semana", label: "Fin de semana" },
+                    ]
+                ).map(({ val, label }) => (
                   <button
                     key={val}
                     type="button"
@@ -531,6 +568,78 @@ export default function SurveyForm() {
                 ))}
               </div>
             </div>
+
+            {/* Campos exclusivos de visitantes */}
+            {isVisitantes && (
+              <>
+                {/* Código de ventana */}
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-2">
+                    Código de ventana (tramo 30 min) <span className="text-destructive">*</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { val: "V1", label: "V1 (0–30 min)" },
+                      { val: "V2", label: "V2 (30–60 min)" },
+                      { val: "V3", label: "V3 (60–90 min)" },
+                    ].map(({ val, label }) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setWindowCode(val)}
+                        className={`py-3 px-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                          windowCode === val
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Minutos inicio/fin */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-foreground block mb-2">Minuto de inicio</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={startMinute}
+                      onChange={(e) => setStartMinute(e.target.value)}
+                      placeholder="0–90"
+                      className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground block mb-2">Minuto de fin</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={endMinute}
+                      onChange={(e) => setEndMinute(e.target.value)}
+                      placeholder="0–90"
+                      className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+
+                {/* Código de cuestionario */}
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-2">Código de cuestionario</label>
+                  <input
+                    type="text"
+                    value={surveyCode}
+                    onChange={(e) => setSurveyCode(e.target.value)}
+                    placeholder="Ej: V-001"
+                    className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </>
+            )}
 
             {/* Time info */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -573,6 +682,18 @@ export default function SurveyForm() {
                 <span className="text-muted-foreground">Franja</span>
                 <span className="font-medium">{timeSlot || "—"}</span>
               </div>
+              {isVisitantes && windowCode && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ventana</span>
+                  <span className="font-medium">{windowCode}</span>
+                </div>
+              )}
+              {isVisitantes && surveyCode && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cód. cuestionario</span>
+                  <span className="font-medium">{surveyCode}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">GPS</span>
                 <span className={`font-medium ${gpsStatus === "ok" ? "text-green-600" : "text-amber-600"}`}>
