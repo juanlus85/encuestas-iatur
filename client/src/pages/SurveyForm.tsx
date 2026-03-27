@@ -329,6 +329,11 @@ export default function SurveyForm() {
   const currentQuestion = currentStep > 0 ? questions[currentStep - 1] : null;
   const isLastStep = currentStep === totalSteps;
 
+  // Scroll al inicio al cambiar de paso
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [currentStep]);
+
   const canProceed = () => {
     if (currentStep === 0) return true;
     if (!currentQuestion) return true;

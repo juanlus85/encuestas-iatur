@@ -9,6 +9,7 @@ import {
   Download,
   FileDown,
   Loader2,
+  PersonStanding,
   Plus,
   RefreshCw,
 } from "lucide-react";
@@ -160,6 +161,159 @@ function ExportSection() {
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Exportando...</>
           ) : (
             <><Download className="h-4 w-4 mr-2" />Descargar CSV</>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Conteos CSV Export ──────────────────────────────────────────────────────
+
+const SURVEY_POINTS_EXPORT = [
+  "Mateos Gago",
+  "Agua / Vida",
+  "Plaza de Alfaro",
+  "Virgen de los Reyes",
+  "Patio de Banderas",
+];
+
+function ExportConteosSection() {
+  const [filters, setFilters] = useState({
+    dateFrom: "",
+    dateTo: "",
+    encuestadorId: undefined as number | undefined,
+    surveyPoint: undefined as string | undefined,
+  });
+  const [separator, setSeparator] = useState<"," | ";" | "\t">(",");
+  const [isExporting, setIsExporting] = useState(false);
+
+  const { data: encuestadores = [] } = trpc.users.encuestadores.useQuery();
+
+  const { refetch } = trpc.export.csvConteos.useQuery(
+    {
+      encuestadorId: filters.encuestadorId,
+      surveyPoint: filters.surveyPoint,
+      dateFrom: filters.dateFrom || undefined,
+      dateTo: filters.dateTo || undefined,
+    },
+    { enabled: false }
+  );
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const result = await refetch();
+      if (!result.data) { toast.error("No hay datos para exportar"); return; }
+      let csvContent = result.data.csv;
+      if (separator !== ",") {
+        csvContent = csvContent.split("\n").map(line =>
+          line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).join(separator)
+        ).join("\n");
+      }
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const dateStr = new Date().toISOString().split("T")[0];
+      a.download = `IATUR_Conteos_${dateStr}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Exportados ${result.data.count} registros de conteo`);
+    } catch {
+      toast.error("Error al exportar. Inténtelo de nuevo.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <PersonStanding className="h-4 w-4 text-amber-600" />
+          Exportar conteos peatonales (CSV)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Desde</label>
+            <input
+              type="date"
+              value={filters.dateFrom}
+              onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+              className="border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Hasta</label>
+            <input
+              type="date"
+              value={filters.dateTo}
+              onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+              className="border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Punto de conteo</label>
+            <select
+              value={filters.surveyPoint ?? ""}
+              onChange={(e) => setFilters({ ...filters, surveyPoint: e.target.value || undefined })}
+              className="border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Todos los puntos</option>
+              {SURVEY_POINTS_EXPORT.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Encuestador</label>
+            <select
+              value={filters.encuestadorId ?? ""}
+              onChange={(e) => setFilters({ ...filters, encuestadorId: e.target.value ? Number(e.target.value) : undefined })}
+              className="border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Todos los encuestadores</option>
+              {encuestadores.map((e) => (
+                <option key={e.id} value={e.id}>{e.name} {e.identifier ? `(${e.identifier})` : ""}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted-foreground">Separador de columnas</label>
+          <div className="flex gap-2">
+            {([[".", "Coma  ,"], [";", "Punto y coma  ;"], ["\t", "Tabulador  ⇥"]] as const).map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setSeparator(val as any)}
+                className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                  separator === val
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-muted/40 rounded-lg p-3 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground mb-1">Campos incluidos:</p>
+          <p>ID · Fecha · Hora · Tramo 30 min · Punto de Conteo · Sentido · Encuestador · Identificador · Personas · Latitud · Longitud · Precisión GPS (m)</p>
+        </div>
+
+        <Button onClick={handleExport} disabled={isExporting} variant="outline" className="w-full sm:w-auto border-amber-300 text-amber-700 hover:bg-amber-50">
+          {isExporting ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Exportando...</>
+          ) : (
+            <><Download className="h-4 w-4 mr-2" />Descargar CSV de conteos</>
           )}
         </Button>
       </CardContent>
@@ -382,7 +536,7 @@ function FieldMetricsSection() {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Exportar() {
-  const [tab, setTab] = useState<"export" | "metrics">("export");
+  const [tab, setTab] = useState<"export" | "conteos" | "metrics">("export");
 
   return (
     <DashboardLayout>
@@ -404,6 +558,15 @@ export default function Exportar() {
             Exportar CSV
           </button>
           <button
+            onClick={() => setTab("conteos")}
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
+              tab === "conteos" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"
+            }`}
+          >
+            <PersonStanding className="h-4 w-4" />
+            Conteos
+          </button>
+          <button
             onClick={() => setTab("metrics")}
             className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
               tab === "metrics" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"
@@ -414,7 +577,9 @@ export default function Exportar() {
           </button>
         </div>
 
-        {tab === "export" ? <ExportSection /> : <FieldMetricsSection />}
+        {tab === "export" && <ExportSection />}
+        {tab === "conteos" && <ExportConteosSection />}
+        {tab === "metrics" && <FieldMetricsSection />}
       </div>
     </DashboardLayout>
   );

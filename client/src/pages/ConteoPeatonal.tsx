@@ -19,6 +19,12 @@ const SURVEY_POINTS = [
 export default function ConteoPeatonal() {
   const { user } = useAuth();
   const [step, setStep] = useState<"punto" | "conteo">("punto");
+
+  // Scroll al inicio cada vez que cambia de pantalla
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [step]);
+
   const [selectedPoint, setSelectedPoint] = useState<string>("");
   const [selectedCount, setSelectedCount] = useState<number | null>(null);
   const [selectedDirection, setSelectedDirection] = useState<{ id?: number; label: string } | null>(null);
@@ -291,6 +297,8 @@ export default function ConteoPeatonal() {
             <Input
               ref={groupInputRef}
               type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               min={9}
               max={999}
               value={groupCount}

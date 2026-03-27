@@ -118,3 +118,9 @@
 - [x] Panel admin: gestión de sentidos por punto (crear/editar/eliminar) en /conteo-sentidos
 - [x] Panel admin: visor de resultados con filtros por fecha, hora, franja y encuestador en /conteo-resultados
 - [x] Tests vitest: 8 tests de conteo (17 en total, todos pasando)
+
+## Mejoras 28/03
+- [x] Exportación CSV de conteos peatonales (con filtros: punto, encuestador, fechas)
+- [x] PWA instalable en Android e iPhone (manifest.json, service worker, iconos)
+- [x] Teclado numérico (inputmode="numeric") en diálogo de grupo grande en conteo
+- [x] Scroll automático al inicio al entrar en pantalla de conteo y formulario de encuesta

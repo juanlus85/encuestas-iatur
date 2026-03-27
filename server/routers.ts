@@ -607,6 +607,53 @@ export const appRouter = router({
   // ─── Export CSV ───────────────────────────────────────────────────────────────────────────────
 
   export: router({
+    csvConteos: adminOrRevisorProcedure
+      .input(z.object({
+        surveyPoint: z.string().optional(),
+        encuestadorId: z.number().optional(),
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        const passes = await getPedestrianPasses(input ?? {});
+        const headers = [
+          "ID", "Fecha", "Hora", "Tramo30min",
+          "Punto de Conteo", "Sentido",
+          "Encuestador", "Identificador",
+          "Personas",
+          "Latitud", "Longitud", "Precisión GPS (m)",
+        ];
+        const getSlot30 = (dt: Date) => {
+          const h = dt.getHours().toString().padStart(2, "0");
+          const m = dt.getMinutes() < 30 ? "00" : "30";
+          const endMin = dt.getMinutes() < 30 ? "30" : "00";
+          const endH = dt.getMinutes() < 30 ? dt.getHours() : dt.getHours() + 1;
+          return `${h}:${m}-${endH.toString().padStart(2, "0")}:${endMin}`;
+        };
+        const rows = passes.map((p) => {
+          const dt = new Date(p.recordedAt);
+          return [
+            p.id,
+            dt.toLocaleDateString("es-ES"),
+            dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+            getSlot30(dt),
+            p.surveyPoint,
+            p.directionLabel ?? "",
+            p.encuestadorName ?? "",
+            p.encuestadorIdentifier ?? "",
+            p.count,
+            p.latitude ?? "",
+            p.longitude ?? "",
+            p.gpsAccuracy ?? "",
+          ];
+        });
+        const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const csvLines = [
+          headers.map(escape).join(","),
+          ...rows.map((row) => row.map(escape).join(",")),
+        ];
+        return { csv: csvLines.join("\n"), count: rows.length };
+      }),
     csv: adminOrRevisorProcedure
       .input(z.object({
         encuestadorId: z.number().optional(),
