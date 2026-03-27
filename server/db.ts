@@ -287,8 +287,8 @@ export async function getDashboardStats(filters?: { dateFrom?: Date; dateTo?: Da
 
   const [totals] = await db.select({
     total: sql<number>`COUNT(*)`,
-    residentes: sql<number>`SUM(CASE WHEN t.type = 'residentes' THEN 1 ELSE 0 END)`,
-    visitantes: sql<number>`SUM(CASE WHEN t.type = 'visitantes' THEN 1 ELSE 0 END)`,
+    residentes: sql<number>`SUM(CASE WHEN ${surveyTemplates.type} = 'residentes' THEN 1 ELSE 0 END)`,
+    visitantes: sql<number>`SUM(CASE WHEN ${surveyTemplates.type} = 'visitantes' THEN 1 ELSE 0 END)`,
   })
     .from(surveyResponses)
     .leftJoin(surveyTemplates, eq(surveyResponses.templateId, surveyTemplates.id))
@@ -307,8 +307,8 @@ export async function getResponsesByDay(filters?: { dateFrom?: Date; dateTo?: Da
   const query = db.select({
     date: sql<string>`DATE(${surveyResponses.startedAt})`,
     total: sql<number>`COUNT(*)`,
-    residentes: sql<number>`SUM(CASE WHEN t.type = 'residentes' THEN 1 ELSE 0 END)`,
-    visitantes: sql<number>`SUM(CASE WHEN t.type = 'visitantes' THEN 1 ELSE 0 END)`,
+    residentes: sql<number>`SUM(CASE WHEN ${surveyTemplates.type} = 'residentes' THEN 1 ELSE 0 END)`,
+    visitantes: sql<number>`SUM(CASE WHEN ${surveyTemplates.type} = 'visitantes' THEN 1 ELSE 0 END)`,
   })
     .from(surveyResponses)
     .leftJoin(surveyTemplates, eq(surveyResponses.templateId, surveyTemplates.id))
@@ -331,8 +331,8 @@ export async function getResponsesByEncuestador(filters?: { dateFrom?: Date; dat
     encuestadorName: surveyResponses.encuestadorName,
     encuestadorIdentifier: surveyResponses.encuestadorIdentifier,
     total: sql<number>`COUNT(*)`,
-    residentes: sql<number>`SUM(CASE WHEN t.type = 'residentes' THEN 1 ELSE 0 END)`,
-    visitantes: sql<number>`SUM(CASE WHEN t.type = 'visitantes' THEN 1 ELSE 0 END)`,
+    residentes: sql<number>`SUM(CASE WHEN ${surveyTemplates.type} = 'residentes' THEN 1 ELSE 0 END)`,
+    visitantes: sql<number>`SUM(CASE WHEN ${surveyTemplates.type} = 'visitantes' THEN 1 ELSE 0 END)`,
   })
     .from(surveyResponses)
     .leftJoin(surveyTemplates, eq(surveyResponses.templateId, surveyTemplates.id))

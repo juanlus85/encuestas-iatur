@@ -93,3 +93,7 @@
 - [x] Módulo de conteo peatonal: UI para encuestador (conteo por dirección, fotos cada minuto)
 - [x] Módulo de conteo peatonal: visor en panel de administración
 - [x] Formato de exportación configurable (separador: coma, punto y coma, tabulador + BOM UTF-8)
+
+## Bug: Dashboard muestra 0 encuestas
+- [x] Diagnosticar por qué el dashboard muestra 0 aunque hay respuestas en BD
+- [x] Corregir la consulta/router del dashboard (alias SQL t.type → ${surveyTemplates.type})

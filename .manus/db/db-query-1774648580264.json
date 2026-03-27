@@ -1,0 +1,15 @@
+{
+  "query": "\nSELECT \n  COUNT(*) as total,\n  SUM(CASE WHEN st.type = 'residentes' THEN 1 ELSE 0 END) as residentes,\n  SUM(CASE WHEN st.type = 'visitantes' THEN 1 ELSE 0 END) as visitantes\nFROM survey_responses sr\nLEFT JOIN survey_templates st ON sr.templateId = st.id\nWHERE sr.status = 'completa';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user uN1yFnMXg2uz2sS.ecce8a0683a4 --database nHD7C8PRaURA7Ubm8Aop3k --execute \nSELECT \n  COUNT(*) as total,\n  SUM(CASE WHEN st.type = 'residentes' THEN 1 ELSE 0 END) as residentes,\n  SUM(CASE WHEN st.type = 'visitantes' THEN 1 ELSE 0 END) as visitantes\nFROM survey_responses sr\nLEFT JOIN survey_templates st ON sr.templateId = st.id\nWHERE sr.status = 'completa';\n",
+  "rows": [
+    {
+      "total": "2",
+      "residentes": "2",
+      "visitantes": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\tresidentes\tvisitantes\n2\t2\t0\n",
+  "stderr": "",
+  "execution_time_ms": 130
+}

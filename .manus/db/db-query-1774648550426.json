@@ -1,0 +1,26 @@
+{
+  "query": "SELECT id, templateId, encuestadorId, status, startedAt, finishedAt FROM survey_responses ORDER BY id DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user uN1yFnMXg2uz2sS.ecce8a0683a4 --database nHD7C8PRaURA7Ubm8Aop3k --execute SELECT id, templateId, encuestadorId, status, startedAt, finishedAt FROM survey_responses ORDER BY id DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "30001",
+      "templateId": "30001",
+      "encuestadorId": "60011",
+      "status": "completa",
+      "startedAt": "2026-03-27 17:54:12",
+      "finishedAt": "2026-03-27 18:04:24"
+    },
+    {
+      "id": "1",
+      "templateId": "1",
+      "encuestadorId": "225",
+      "status": "completa",
+      "startedAt": "2026-03-26 00:41:50",
+      "finishedAt": "2026-03-26 00:42:29"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttemplateId\tencuestadorId\tstatus\tstartedAt\tfinishedAt\n30001\t30001\t60011\tcompleta\t2026-03-27 17:54:12\t2026-03-27 18:04:24\n1\t1\t225\tcompleta\t2026-03-26 00:41:50\t2026-03-26 00:42:29\n",
+  "stderr": "",
+  "execution_time_ms": 120
+}
