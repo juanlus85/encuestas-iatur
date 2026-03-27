@@ -651,14 +651,54 @@ export default function SurveyForm() {
 
         {/* Steps 1..n: Questions */}
         {currentStep > 0 && currentQuestion && (
-          <QuestionRenderer
-            question={currentQuestion}
-            lang={lang}
-            answer={getAnswer(currentQuestion.id)}
-            onAnswer={(val) => setAnswer(currentQuestion.id, val)}
-            photos={photos.filter((p) => p.questionId === currentQuestion.id)}
-            onPhoto={(d) => setPhotos((prev) => [...prev, d])}
-          />
+          <div className="space-y-5">
+            <QuestionRenderer
+              question={currentQuestion}
+              lang={lang}
+              answer={getAnswer(currentQuestion.id)}
+              onAnswer={(val) => setAnswer(currentQuestion.id, val)}
+              photos={photos.filter((p) => p.questionId === currentQuestion.id)}
+              onPhoto={(d) => setPhotos((prev) => [...prev, d])}
+            />
+            {/* Navigation buttons — right below the question */}
+            <div className="flex gap-3 pt-2">
+              {currentStep > 1 && (
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentStep((s) => s - 1)}
+                  className="flex-1"
+                  disabled={submitting}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </Button>
+              )}
+              {currentStep < totalSteps ? (
+                <Button
+                  onClick={() => setCurrentStep((s) => s + 1)}
+                  className="flex-1"
+                  disabled={!canProceed()}
+                  size="lg"
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  disabled={submitting}
+                  size="lg"
+                >
+                  {submitting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enviando...</>
+                  ) : (
+                    <><CheckCircle2 className="h-4 w-4 mr-2" />Enviar encuesta</>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Last step: Summary + extra photos */}
@@ -722,10 +762,24 @@ export default function SurveyForm() {
         )}
       </div>
 
-      {/* Bottom navigation */}
-      <div className="sticky bottom-0 bg-background border-t border-border px-4 py-4 max-w-2xl mx-auto w-full">
-        <div className="flex gap-3">
-          {currentStep > 0 && (
+      {/* Step 0 navigation: Iniciar encuesta */}
+      {currentStep === 0 && (
+        <div className="max-w-2xl mx-auto w-full px-4 pb-6">
+          <Button
+            onClick={() => setCurrentStep(1)}
+            className="w-full"
+            size="lg"
+            disabled={!canProceed()}
+          >
+            Iniciar encuesta
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
+      {/* Last step navigation: Enviar */}
+      {currentStep === totalSteps && totalSteps > 0 && (
+        <div className="max-w-2xl mx-auto w-full px-4 pb-6">
+          <div className="flex gap-3">
             <Button
               variant="outline"
               onClick={() => setCurrentStep((s) => s - 1)}
@@ -735,22 +789,11 @@ export default function SurveyForm() {
               <ChevronLeft className="h-4 w-4 mr-1" />
               Anterior
             </Button>
-          )}
-
-          {currentStep < totalSteps ? (
-            <Button
-              onClick={() => setCurrentStep((s) => s + 1)}
-              className="flex-1"
-              disabled={!canProceed()}
-            >
-              {currentStep === 0 ? "Iniciar encuesta" : "Siguiente"}
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          ) : (
             <Button
               onClick={handleSubmit}
               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
               disabled={submitting}
+              size="lg"
             >
               {submitting ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enviando...</>
@@ -758,9 +801,9 @@ export default function SurveyForm() {
                 <><CheckCircle2 className="h-4 w-4 mr-2" />Enviar encuesta</>
               )}
             </Button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

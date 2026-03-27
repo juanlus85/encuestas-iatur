@@ -100,3 +100,8 @@
 
 ## Bug: SelectItem value vacío en /conteo-resultados
 - [x] Corregir SelectItem con value="" en ConteoResultados.tsx (cambiado a value="all")
+
+## Mejoras UX (27/03)
+- [x] Botón de cerrar sesión visible en la cabecera/sidebar para todos los roles
+- [x] Botón "Siguiente" pegado debajo de la pregunta en el formulario (no al pie de página)
+- [x] Menú de conteo peatonal visible para encuestadores en su sidebar (verificado: sí aparece con rol encuestador)

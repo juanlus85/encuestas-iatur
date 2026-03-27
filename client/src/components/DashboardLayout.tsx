@@ -1,13 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -222,43 +215,36 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           {/* Footer */}
-          <SidebarFooter className="p-3 border-t border-sidebar-border">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-sidebar-accent transition-colors w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
-                  <Avatar className="h-8 w-8 shrink-0 border border-sidebar-border">
-                    <AvatarFallback className="text-xs font-semibold bg-sidebar-primary text-sidebar-primary-foreground">
-                      {user?.name?.charAt(0).toUpperCase() ?? "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  {!isCollapsed && (
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-sidebar-foreground truncate leading-tight">
-                        {user?.name || "Usuario"}
-                      </p>
-                      <p className="text-xs text-sidebar-foreground/50 truncate mt-0.5">{roleLabel}</p>
-                    </div>
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <div className="px-3 py-2">
-                  <p className="text-sm font-medium">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground">{roleLabel}</p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Cerrar sesión
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <div className="px-3 py-1.5">
-                  <p className="text-xs text-muted-foreground">
-                    {APP_VERSION} · {BUILD_DATE}
+          <SidebarFooter className="p-3 border-t border-sidebar-border space-y-1">
+            {/* User info row */}
+            <div className="flex items-center gap-3 rounded-lg px-2 py-2">
+              <Avatar className="h-8 w-8 shrink-0 border border-sidebar-border">
+                <AvatarFallback className="text-xs font-semibold bg-sidebar-primary text-sidebar-primary-foreground">
+                  {user?.name?.charAt(0).toUpperCase() ?? "U"}
+                </AvatarFallback>
+              </Avatar>
+              {!isCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-sidebar-foreground truncate leading-tight">
+                    {user?.name || "Usuario"}
                   </p>
+                  <p className="text-xs text-sidebar-foreground/50 truncate mt-0.5">{roleLabel}</p>
                 </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
+            </div>
+            {/* Logout button — always visible */}
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 w-full rounded-lg px-2 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+            >
+              <LogOut className="h-4 w-4 shrink-0" />
+              {!isCollapsed && <span>Cerrar sesión</span>}
+            </button>
+            {!isCollapsed && (
+              <p className="text-xs text-muted-foreground px-2 pb-1">
+                {APP_VERSION} · {BUILD_DATE}
+              </p>
+            )}
           </SidebarFooter>
         </Sidebar>
 

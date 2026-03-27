@@ -1,0 +1,59 @@
+{
+  "query": "SELECT id, name, role, username, identifier FROM users ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user uN1yFnMXg2uz2sS.ecce8a0683a4 --database nHD7C8PRaURA7Ubm8Aop3k --execute SELECT id, name, role, username, identifier FROM users ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Juan Luis Blanco Guzmán",
+      "role": "admin",
+      "username": "NULL",
+      "identifier": "NULL"
+    },
+    {
+      "id": "114",
+      "name": "Juan Luis Enc",
+      "role": "encuestador",
+      "username": "NULL",
+      "identifier": "ENC-01"
+    },
+    {
+      "id": "164",
+      "name": "Curro",
+      "role": "encuestador",
+      "username": "NULL",
+      "identifier": "ENC-02"
+    },
+    {
+      "id": "225",
+      "name": "Paco",
+      "role": "encuestador",
+      "username": "paco",
+      "identifier": "enc03"
+    },
+    {
+      "id": "60011",
+      "name": "ConchaEnc",
+      "role": "encuestador",
+      "username": "conchaenc",
+      "identifier": "ENC1"
+    },
+    {
+      "id": "60020",
+      "name": "ConchaAdmin",
+      "role": "admin",
+      "username": "conchaadmin",
+      "identifier": ""
+    },
+    {
+      "id": "90102",
+      "name": "JUANLU",
+      "role": "encuestador",
+      "username": "juanlu",
+      "identifier": "JUANLU"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\trole\tusername\tidentifier\n1\tJuan Luis Blanco Guzmán\tadmin\tNULL\tNULL\n114\tJuan Luis Enc\tencuestador\tNULL\tENC-01\n164\tCurro\tencuestador\tNULL\tENC-02\n225\tPaco\tencuestador\tpaco\tenc03\n60011\tConchaEnc\tencuestador\tconchaenc\tENC1\n60020\tConchaAdmin\tadmin\tconchaadmin\t\n90102\tJUANLU\tencuestador\tjuanlu\tJUANLU\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}
