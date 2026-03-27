@@ -114,6 +114,11 @@ export default function Estadisticas() {
     dateFrom: dateFrom ? new Date(dateFrom) : undefined,
     dateTo: dateTo ? new Date(dateTo + "T23:59:59") : undefined,
   });
+  // Rechazos
+  const { data: rejStats } = trpc.rejections.stats.useQuery({
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  });
 
   const TARGET_RESIDENTES = 300;
   const TARGET_VISITANTES = 450;
@@ -299,6 +304,58 @@ export default function Estadisticas() {
                       <Bar dataKey="visitantes" name="Visitantes" fill={COLORS.warning} stackId="a" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Rechazos */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
+                  Rechazos a la encuesta
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-2">
+                  {[
+                    { label: "Total rechazos", value: (rejStats as any)?.total ?? 0, color: "text-red-600" },
+                    { label: "Rechazos residentes", value: (rejStats as any)?.byType?.residentes ?? 0, color: "text-blue-600" },
+                    { label: "Rechazos visitantes", value: (rejStats as any)?.byType?.visitantes ?? 0, color: "text-amber-600" },
+                    {
+                      label: "Tasa de rechazo",
+                      value: total > 0
+                        ? `${(((rejStats as any)?.total ?? 0) / (total + ((rejStats as any)?.total ?? 0)) * 100).toFixed(1)}%`
+                        : "—",
+                      color: "text-muted-foreground",
+                    },
+                  ].map((s) => (
+                    <div key={s.label} className="text-center">
+                      <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                {(rejStats as any)?.byPoint && Object.keys((rejStats as any).byPoint).length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Por punto de encuesta</p>
+                    <div className="space-y-1.5">
+                      {Object.entries((rejStats as any).byPoint as Record<string, number>)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([point, count]) => (
+                          <div key={point} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-32 truncate shrink-0">{point}</span>
+                            <div className="flex-1 bg-muted rounded-full h-2">
+                              <div
+                                className="bg-red-400 h-2 rounded-full"
+                                style={{ width: `${Math.min(100, (count / Math.max(1, (rejStats as any)?.total ?? 1)) * 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium w-6 text-right">{count}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>

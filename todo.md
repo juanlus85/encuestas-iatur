@@ -138,3 +138,9 @@
 
 ## Bug: Mapa de calor de conteos no muestra datos
 - [x] Corregido: faltaba la librería `visualization` en el script de Google Maps + rediseño del componente para inicializar el mapa después de tener los datos (no antes)
+
+## Correcciones 28/03 (noche)
+- [x] BD: surveyPoint, latitude, longitude, gpsAccuracy ya estaban en survey_rejections (schema correcto)
+- [x] UI encuestador: selector de punto de encuesta en pantalla principal (persiste en localStorage); GPS con watchPosition continuo
+- [x] Rechazos en estadísticas: sección de rechazos con total, por tipo, tasa de rechazo y desglose por punto
+- [x] GPS en conteos: cambiado de getCurrentPosition a watchPosition para GPS continuo y más preciso

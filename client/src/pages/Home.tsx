@@ -27,16 +27,26 @@ function EncuestadorHome() {
   const { data: myResponses } = trpc.responses.myList.useQuery();
   const { data: templates } = trpc.templates.active.useQuery();
 
-  // GPS para rechazos
+  // Punto de encuesta activo (persiste entre sesiones)
+  const SURVEY_POINTS = ["Mateos Gago", "Agua", "Rodrigo Caro", "Pimienta", "Mesón del Moro"];
+  const [selectedPoint, setSelectedPoint] = useState<string>(() => {
+    return localStorage.getItem("iatur_survey_point") ?? "";
+  });
+  const handlePointChange = (p: string) => {
+    setSelectedPoint(p);
+    localStorage.setItem("iatur_survey_point", p);
+  };
+
+  // GPS para rechazos (se actualiza continuamente)
   const [gps, setGps] = useState<{ lat: number; lng: number; acc: number } | null>(null);
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy }),
-        () => {},
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
+    if (!navigator.geolocation) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy }),
+      () => {},
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   const addRejection = trpc.rejections.add.useMutation({
@@ -46,10 +56,10 @@ function EncuestadorHome() {
     onError: (err) => toast.error("Error al registrar rechazo: " + err.message),
   });
 
-  const handleRejection = (surveyType: "residentes" | "visitantes", surveyPoint?: string) => {
+  const handleRejection = (surveyType: "residentes" | "visitantes") => {
     addRejection.mutate({
       surveyType,
-      surveyPoint,
+      surveyPoint: selectedPoint || undefined,
       latitude: gps?.lat,
       longitude: gps?.lng,
       gpsAccuracy: gps?.acc,
@@ -130,6 +140,23 @@ function EncuestadorHome() {
         {/* Active surveys */}
         <div>
           <h2 className="text-base font-semibold text-foreground mb-3">Encuestas Activas</h2>
+          {/* Selector de punto de encuesta */}
+          <div className="mb-3 flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+            <select
+              value={selectedPoint}
+              onChange={(e) => handlePointChange(e.target.value)}
+              className="flex-1 border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">-- Selecciona tu punto de encuesta --</option>
+              {SURVEY_POINTS.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+            {gps && (
+              <span className="text-xs text-green-600 shrink-0">GPS ✓</span>
+            )}
+          </div>
           <div className="space-y-3">
             {templates?.map((t) => (
               <div key={t.id} className="flex items-stretch gap-2">
@@ -158,8 +185,7 @@ function EncuestadorHome() {
                       <ClipboardList className="h-5 w-5 text-primary" />
                     </div>
                   </div>
-                </button>
-                {/* Botón de rechazo rápido */}
+                </button>                {/* Botón de rechazo rápido */}
                 <button
                   onClick={() => handleRejection(t.type as "residentes" | "visitantes")}
                   disabled={addRejection.isPending}

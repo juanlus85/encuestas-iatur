@@ -61,13 +61,14 @@ export default function ConteoPeatonal() {
   });
 
   useEffect(() => {
-    if (step === "conteo" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy }),
-        () => setGps(null),
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
+    if (step !== "conteo" || !navigator.geolocation) return;
+    // watchPosition: GPS continuo, más preciso en móvil
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy }),
+      () => setGps(null),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [step]);
 
   const handleAddPass = () => {
