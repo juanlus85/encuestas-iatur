@@ -29,11 +29,14 @@ import {
   Users,
   PersonStanding,
   Flame,
+  Target,
+  DoorOpen,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
+import { OfflineIndicator } from "./OfflineIndicator";
 
 // ─── Navigation config ────────────────────────────────────────────────────────
 
@@ -45,6 +48,7 @@ const adminMenuItems = [
   { icon: ClipboardList, label: "Resultados", path: "/resultados" },
   { icon: PersonStanding, label: "Conteos Peatonales", path: "/conteo-resultados" },
   { icon: ArrowUpDown, label: "Sentidos de Conteo", path: "/conteo-sentidos" },
+  { icon: Target, label: "Cuotas", path: "/cuotas" },
   { icon: FileDown, label: "Exportar", path: "/exportar" },
   { icon: Users, label: "Usuarios", path: "/usuarios" },
   { icon: Settings, label: "Configuración", path: "/configuracion" },
@@ -57,6 +61,7 @@ const revisorMenuItems = [
   { icon: Flame, label: "Mapa Conteos", path: "/mapa-conteos" },
   { icon: ClipboardList, label: "Resultados", path: "/resultados" },
   { icon: PersonStanding, label: "Conteos Peatonales", path: "/conteo-resultados" },
+  { icon: Target, label: "Cuotas", path: "/cuotas" },
   { icon: FileDown, label: "Exportar", path: "/exportar" },
 ];
 
@@ -64,6 +69,8 @@ const encuestadorMenuItems = [
   { icon: LayoutDashboard, label: "Inicio", path: "/" },
   { icon: ClipboardList, label: "Nueva Encuesta", path: "/encuesta" },
   { icon: PersonStanding, label: "Conteo Peatonal", path: "/conteo" },
+  { icon: Target, label: "Cuotas", path: "/cuotas" },
+  { icon: DoorOpen, label: "Cierre de Turno", path: "/cierre-turno" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -100,6 +107,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SidebarProvider style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}>
+      {user?.role === "encuestador" && <OfflineIndicator />}
       <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
         {children}
       </DashboardLayoutContent>

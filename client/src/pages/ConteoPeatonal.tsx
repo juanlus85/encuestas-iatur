@@ -5,29 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { MapPin, Users, ChevronLeft, Plus, CheckCircle2, ArrowRight } from "lucide-react";
+import { Users, ChevronLeft, Plus, CheckCircle2, ArrowRight, ArrowLeftRight } from "lucide-react";
 import { Link } from "wouter";
-
-const SURVEY_POINTS = [
-  "Mateos Gago",
-  "Agua / Vida",
-  "Plaza de Alfaro",
-  "Virgen de los Reyes",
-  "Patio de Banderas",
-];
+import { SURVEY_POINTS, getFlowsForPoint, type SurveyPoint } from "../../../shared/surveyPoints";
 
 export default function ConteoPeatonal() {
   const { user } = useAuth();
   const [step, setStep] = useState<"punto" | "conteo">("punto");
-
-  // Scroll al inicio cada vez que cambia de pantalla
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" });
-  }, [step]);
-
-  const [selectedPoint, setSelectedPoint] = useState<string>("");
+  const [selectedPoint, setSelectedPoint] = useState<SurveyPoint | null>(null);
   const [selectedCount, setSelectedCount] = useState<number | null>(null);
-  const [selectedDirection, setSelectedDirection] = useState<{ id?: number; label: string } | null>(null);
+  const [selectedFlow, setSelectedFlow] = useState<string | null>(null);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupCount, setGroupCount] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number; acc: number } | null>(null);
@@ -35,26 +22,23 @@ export default function ConteoPeatonal() {
   const [totalToday, setTotalToday] = useState(0);
   const groupInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: directions = [] } = trpc.directions.byPoint.useQuery(
-    { surveyPoint: selectedPoint },
-    { enabled: !!selectedPoint }
-  );
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [step]);
 
   const addPass = trpc.passes.add.useMutation({
     onSuccess: () => {
-      if (selectedCount !== null && selectedDirection) {
+      if (selectedCount !== null && selectedFlow) {
         const newPass = {
           count: selectedCount,
-          direction: selectedDirection.label,
+          direction: selectedFlow,
           time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
         };
-        setRecentPasses(prev => [newPass, ...prev.slice(0, 9)]);
-        setTotalToday(prev => prev + (selectedCount ?? 0));
-        toast.success(`+${selectedCount} persona${selectedCount !== 1 ? "s" : ""} · ${selectedDirection.label}`, {
-          duration: 1500,
-        });
+        setRecentPasses((prev) => [newPass, ...prev.slice(0, 9)]);
+        setTotalToday((prev) => prev + (selectedCount ?? 0));
+        toast.success(`+${selectedCount} persona${selectedCount !== 1 ? "s" : ""} · ${selectedFlow}`, { duration: 1500 });
         setSelectedCount(null);
-        setSelectedDirection(null);
+        setSelectedFlow(null);
       }
     },
     onError: (err) => toast.error("Error al guardar: " + err.message),
@@ -62,7 +46,6 @@ export default function ConteoPeatonal() {
 
   useEffect(() => {
     if (step !== "conteo" || !navigator.geolocation) return;
-    // watchPosition: GPS continuo, más preciso en móvil
     const watchId = navigator.geolocation.watchPosition(
       (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy }),
       () => setGps(null),
@@ -72,14 +55,13 @@ export default function ConteoPeatonal() {
   }, [step]);
 
   const handleAddPass = () => {
-    if (!selectedCount || !selectedDirection) {
-      toast.error("Selecciona el número de personas y el sentido");
+    if (!selectedCount || !selectedFlow || !selectedPoint) {
+      toast.error("Selecciona el número de personas y el flujo");
       return;
     }
     addPass.mutate({
-      surveyPoint: selectedPoint,
-      directionId: selectedDirection.id,
-      directionLabel: selectedDirection.label,
+      surveyPoint: selectedPoint.fullName,
+      directionLabel: selectedFlow,
       count: selectedCount,
       latitude: gps?.lat,
       longitude: gps?.lng,
@@ -97,7 +79,6 @@ export default function ConteoPeatonal() {
     }
   };
 
-  // ─── Pantalla 1: Selección de punto ──────────────────────────────────────────
   if (step === "punto") {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -112,31 +93,28 @@ export default function ConteoPeatonal() {
             <p className="text-sm text-gray-500">{user?.name}</p>
           </div>
         </div>
-
         <div className="flex-1 p-4 max-w-lg mx-auto w-full">
           <div className="mb-6 mt-4">
             <h2 className="text-xl font-bold text-gray-800 mb-1">Selecciona el punto de conteo</h2>
             <p className="text-sm text-gray-500">Elige el punto donde vas a realizar el conteo peatonal</p>
           </div>
-
           <div className="space-y-3">
             {SURVEY_POINTS.map((point) => (
               <button
-                key={point}
-                onClick={() => {
-                  setSelectedPoint(point);
-                  setStep("conteo");
-                }}
+                key={point.code}
+                onClick={() => { setSelectedPoint(point); setStep("conteo"); }}
                 className="w-full text-left bg-white border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 rounded-xl p-5 transition-all duration-150 flex items-center gap-4 group"
               >
                 <div className="w-12 h-12 rounded-full bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center shrink-0 transition-colors">
-                  <MapPin className="h-6 w-6 text-blue-700" />
+                  <span className="text-blue-700 font-bold text-lg">{point.code}</span>
                 </div>
-                <div>
-                  <div className="font-semibold text-gray-900 text-base">{point}</div>
-                  <div className="text-sm text-gray-500">Barrio de Santa Cruz</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-gray-900 text-base">{point.name}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {point.subPoints.map((s) => s.name).join(" · ")}
+                  </div>
                 </div>
-                <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 ml-auto transition-colors" />
+                <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 ml-auto transition-colors shrink-0" />
               </button>
             ))}
           </div>
@@ -145,27 +123,26 @@ export default function ConteoPeatonal() {
     );
   }
 
-  // ─── Pantalla 2: Conteo ───────────────────────────────────────────────────────
-  const canAdd = selectedCount !== null && selectedDirection !== null;
+  const flows = selectedPoint ? getFlowsForPoint(selectedPoint) : [];
+  const canAdd = selectedCount !== null && selectedFlow !== null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
           className="shrink-0"
-          onClick={() => { setStep("punto"); setSelectedCount(null); setSelectedDirection(null); }}
+          onClick={() => { setStep("punto"); setSelectedCount(null); setSelectedFlow(null); }}
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-semibold text-gray-900 truncate">{selectedPoint}</h1>
+          <h1 className="text-base font-semibold text-gray-900 truncate">
+            {selectedPoint?.code} {selectedPoint?.name}
+          </h1>
           <p className="text-xs text-gray-500">
-            {gps
-              ? `GPS ±${Math.round(gps.acc)}m`
-              : "Obteniendo GPS..."}
+            {gps ? `GPS ±${Math.round(gps.acc)}m` : "Obteniendo GPS..."}
           </p>
         </div>
         <div className="text-right shrink-0">
@@ -175,8 +152,6 @@ export default function ConteoPeatonal() {
       </div>
 
       <div className="flex-1 p-4 max-w-lg mx-auto w-full space-y-5">
-
-        {/* Sección: Número de personas */}
         <div>
           <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
             <Users className="h-4 w-4" /> Personas
@@ -196,90 +171,68 @@ export default function ConteoPeatonal() {
               </button>
             ))}
           </div>
-          {/* Botón grupo */}
           <button
-            onClick={() => setGroupDialogOpen(true)}
-            className={`w-full h-14 rounded-xl text-base font-semibold border-2 transition-all duration-100 flex items-center justify-center gap-2 ${
+            onClick={() => {
+              setGroupDialogOpen(true);
+              setTimeout(() => groupInputRef.current?.focus(), 100);
+            }}
+            className={`w-full h-14 rounded-xl border-2 flex items-center justify-center gap-2 font-semibold text-base transition-all duration-100 ${
               selectedCount !== null && selectedCount > 8
                 ? "bg-amber-500 border-amber-500 text-white shadow-md"
                 : "bg-white border-dashed border-gray-300 text-gray-600 hover:border-amber-400 hover:bg-amber-50"
             }`}
           >
             <Plus className="h-5 w-5" />
-            {selectedCount !== null && selectedCount > 8
-              ? `Grupo: ${selectedCount} personas`
-              : "Grupo grande (9+)"}
+            {selectedCount !== null && selectedCount > 8 ? `Grupo: ${selectedCount} personas` : "Grupo grande (9+)"}
           </button>
         </div>
 
-        {/* Sección: Sentido */}
         <div>
-          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
-            Sentido
+          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+            <ArrowLeftRight className="h-4 w-4" /> Flujo (sentido)
           </h2>
-          {directions.length === 0 ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center text-sm text-amber-700">
-              No hay sentidos configurados para este punto.<br />
-              <span className="font-medium">El administrador debe añadirlos en Configuración → Sentidos.</span>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {directions.map((d) => (
-                <button
-                  key={d.id}
-                  onClick={() => setSelectedDirection({ id: d.id, label: d.label })}
-                  className={`w-full text-left px-5 py-4 rounded-xl border-2 font-medium text-base transition-all duration-100 ${
-                    selectedDirection?.id === d.id
-                      ? "bg-blue-700 border-blue-700 text-white shadow-md"
-                      : "bg-white border-gray-200 text-gray-800 hover:border-blue-400 hover:bg-blue-50"
-                  }`}
-                >
-                  {d.label}
-                  {d.description && (
-                    <span className={`block text-xs mt-0.5 ${selectedDirection?.id === d.id ? "text-blue-200" : "text-gray-400"}`}>
-                      {d.description}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="space-y-2">
+            {flows.map((flow) => (
+              <button
+                key={flow.label}
+                onClick={() => setSelectedFlow(flow.label)}
+                className={`w-full text-left px-4 py-3.5 rounded-xl border-2 font-medium text-sm transition-all duration-100 ${
+                  selectedFlow === flow.label
+                    ? "bg-blue-700 border-blue-700 text-white shadow-md"
+                    : "bg-white border-gray-200 text-gray-800 hover:border-blue-400 hover:bg-blue-50"
+                }`}
+              >
+                {flow.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Botón Añadir */}
         <Button
           onClick={handleAddPass}
           disabled={!canAdd || addPass.isPending}
-          className={`w-full h-16 text-xl font-bold rounded-xl transition-all duration-150 ${
+          className={`w-full h-16 text-lg font-bold rounded-xl transition-all duration-150 ${
             canAdd
               ? "bg-green-600 hover:bg-green-700 text-white shadow-lg"
               : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
         >
-          {addPass.isPending ? (
-            "Guardando..."
-          ) : canAdd ? (
-            <>
-              <CheckCircle2 className="h-6 w-6 mr-2" />
-              Añadir · {selectedCount} persona{selectedCount !== 1 ? "s" : ""} · {selectedDirection?.label}
-            </>
-          ) : (
-            "Selecciona personas y sentido"
-          )}
+          {addPass.isPending ? "Guardando..." : canAdd ? (
+            <><CheckCircle2 className="h-6 w-6 mr-2" />Añadir · {selectedCount} persona{selectedCount !== 1 ? "s" : ""}</>
+          ) : "Selecciona personas y flujo"}
         </Button>
 
-        {/* Historial reciente */}
         {recentPasses.length > 0 && (
           <div>
             <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Últimos registros</h2>
             <div className="space-y-1.5">
               {recentPasses.map((p, i) => (
                 <div key={i} className="bg-white border border-gray-100 rounded-lg px-4 py-2.5 flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-blue-700 text-base">{p.count}</span>
-                    <span className="text-gray-700">{p.direction}</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="font-bold text-blue-700 text-base shrink-0">{p.count}</span>
+                    <span className="text-gray-700 truncate">{p.direction}</span>
                   </div>
-                  <span className="text-gray-400 text-xs">{p.time}</span>
+                  <span className="text-gray-400 text-xs shrink-0 ml-2">{p.time}</span>
                 </div>
               ))}
             </div>
@@ -287,12 +240,9 @@ export default function ConteoPeatonal() {
         )}
       </div>
 
-      {/* Dialog: grupo grande */}
       <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Grupo grande</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Grupo grande</DialogTitle></DialogHeader>
           <div className="py-2">
             <p className="text-sm text-gray-600 mb-3">Introduce el número exacto de personas del grupo:</p>
             <Input
@@ -311,12 +261,8 @@ export default function ConteoPeatonal() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setGroupDialogOpen(false); setGroupCount(""); }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleGroupConfirm} disabled={!groupCount || parseInt(groupCount) < 1}>
-              Confirmar
-            </Button>
+            <Button variant="outline" onClick={() => { setGroupDialogOpen(false); setGroupCount(""); }}>Cancelar</Button>
+            <Button onClick={handleGroupConfirm} disabled={!groupCount || parseInt(groupCount) < 1}>Confirmar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

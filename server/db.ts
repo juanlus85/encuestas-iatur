@@ -13,6 +13,10 @@ import {
   surveyResponses,
   surveyTemplates,
   users,
+  shifts,
+  shiftClosures,
+  InsertShift,
+  InsertShiftClosure,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -619,4 +623,99 @@ export async function getSurveyRejectionStats(filters?: {
     byEncuestador[enc] = (byEncuestador[enc] ?? 0) + 1;
   }
   return { total: rejections.length, byType, byPoint, byHour, byEncuestador, rejections };
+}
+
+// ─── Shifts (Turnos) ──────────────────────────────────────────────────────────
+
+export async function createShift(data: InsertShift) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const [result] = await db.insert(shifts).values(data);
+  return result;
+}
+
+export async function getShiftsByEncuestador(encuestadorId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(shifts)
+    .where(eq(shifts.encuestadorId, encuestadorId))
+    .orderBy(desc(shifts.shiftDate));
+}
+
+export async function getAllShifts() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(shifts).orderBy(desc(shifts.shiftDate));
+}
+
+export async function updateShift(id: number, data: Partial<InsertShift>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(shifts).set(data).where(eq(shifts.id, id));
+}
+
+export async function deleteShift(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(shifts).where(eq(shifts.id, id));
+}
+
+// ─── Shift Closures (Cierre de turno) ────────────────────────────────────────────────
+
+export async function createShiftClosure(data: InsertShiftClosure) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const [result] = await db.insert(shiftClosures).values(data);
+  return result;
+}
+
+export async function getShiftClosuresByEncuestador(encuestadorId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(shiftClosures)
+    .where(eq(shiftClosures.encuestadorId, encuestadorId))
+    .orderBy(desc(shiftClosures.closedAt));
+}
+
+export async function getAllShiftClosures() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(shiftClosures).orderBy(desc(shiftClosures.closedAt));
+}
+
+// ─── Última localización de encuestadores ─────────────────────────────────────────────
+export async function getLatestEncuestadorLocations() {
+  const db = await getDb();
+  if (!db) return [];
+  // Get the most recent GPS location for each encuestador
+  const result = await db.execute(sql`
+    SELECT 
+      sr.encuestadorId,
+      sr.encuestadorName,
+      sr.encuestadorIdentifier,
+      sr.latitude,
+      sr.longitude,
+      sr.gpsAccuracy,
+      sr.startedAt AS lastSeen,
+      sr.surveyPoint
+    FROM survey_responses sr
+    INNER JOIN (
+      SELECT encuestadorId, MAX(startedAt) AS maxDate
+      FROM survey_responses
+      WHERE latitude IS NOT NULL AND encuestadorId IS NOT NULL
+      GROUP BY encuestadorId
+    ) latest ON sr.encuestadorId = latest.encuestadorId AND sr.startedAt = latest.maxDate
+    WHERE sr.latitude IS NOT NULL
+    ORDER BY sr.startedAt DESC
+  `);
+  return ((result[0] as unknown) as any[]).map((row: any) => ({
+    encuestadorId: row.encuestadorId,
+    encuestadorName: row.encuestadorName,
+    encuestadorIdentifier: row.encuestadorIdentifier,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    gpsAccuracy: row.gpsAccuracy,
+    lastSeen: row.lastSeen,
+    surveyPoint: row.surveyPoint,
+  }));
 }

@@ -157,9 +157,16 @@ export default function Login() {
           </Button>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Universidad de Sevilla · IATUR · Barrio de Santa Cruz
-        </p>
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-center text-xs text-muted-foreground">
+            Universidad de Sevilla · IATUR · Barrio de Santa Cruz
+          </p>
+          <img
+            src="https://d2xsxph8kpxj0f.cloudfront.net/310419663031419078/nHD7C8PRaURA7Ubm8Aop3k/logos-institucionales_1f505402.jpg"
+            alt="Logos institucionales: Ayuntamiento de Sevilla y Sevilla FeelingLand"
+            className="h-16 object-contain opacity-80"
+          />
+        </div>
       </div>
     </div>
   );

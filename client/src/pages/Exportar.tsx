@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { SURVEY_POINTS as SP_EXPORT } from "../../../shared/surveyPoints";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
@@ -169,14 +170,7 @@ function ExportSection() {
 }
 
 // ─── Conteos CSV Export ──────────────────────────────────────────────────────
-
-const SURVEY_POINTS_EXPORT = [
-  "Mateos Gago",
-  "Agua / Vida",
-  "Plaza de Alfaro",
-  "Virgen de los Reyes",
-  "Patio de Banderas",
-];
+const SURVEY_POINTS_EXPORT = SP_EXPORT.map((p) => p.fullName);
 
 function ExportConteosSection() {
   const [filters, setFilters] = useState({

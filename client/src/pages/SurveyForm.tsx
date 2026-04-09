@@ -515,26 +515,13 @@ export default function SurveyForm() {
                 className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Seleccionar punto...</option>
-                {isVisitantes ? (
-                  <>
-                    <option value="Mateos Gago">Mateos Gago</option>
-                    <option value="Agua/Vida">Agua/Vida</option>
-                    <option value="Plaza de Alfaro">Plaza de Alfaro</option>
-                    <option value="Virgen de los Reyes">Virgen de los Reyes</option>
-                    <option value="Patio de Banderas">Patio de Banderas</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="Plaza del Triunfo">Plaza del Triunfo</option>
-                    <option value="Catedral">Catedral</option>
-                    <option value="Alcázar">Alcázar</option>
-                    <option value="Calle Mateos Gago">Calle Mateos Gago</option>
-                    <option value="Plaza de Doña Elvira">Plaza de Doña Elvira</option>
-                    <option value="Callejón del Agua">Callejón del Agua</option>
-                    <option value="Jardines de Murillo">Jardines de Murillo</option>
-                    <option value="Otro">Otro</option>
-                  </>
-                )}
+                {/* Puntos definitivos del proyecto IATUR - Santa Cruz 2026 */}
+                <option value="01 Virgen de los Reyes">01 Virgen de los Reyes</option>
+                <option value="02 Mateos Gago">02 Mateos Gago</option>
+                <option value="03 Patio de Banderas">03 Patio de Banderas</option>
+                <option value="04 Agua / Vida">04 Agua / Vida</option>
+                <option value="05 Plaza Alfaro">05 Plaza Alfaro</option>
+                {!isVisitantes && <option value="Otro">Otro</option>}
               </select>
             </div>
 

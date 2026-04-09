@@ -50,6 +50,13 @@
       "when": 1774653845768,
       "tag": "0006_slow_human_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1775774230081,
+      "tag": "0007_sour_amphibian",
+      "breakpoints": true
     }
   ]
 }

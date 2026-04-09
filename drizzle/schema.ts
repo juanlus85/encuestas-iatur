@@ -302,3 +302,56 @@ export const surveyRejections = mysqlTable("survey_rejections", {
 
 export type SurveyRejection = typeof surveyRejections.$inferSelect;
 export type InsertSurveyRejection = typeof surveyRejections.$inferInsert;
+
+// ─── Turnos asignados ─────────────────────────────────────────────────────────
+/**
+ * Turnos de trabajo asignados a cada encuestador.
+ * El administrador los crea/edita desde el panel de Usuarios.
+ */
+export const shifts = mysqlTable("shifts", {
+  id: int("id").autoincrement().primaryKey(),
+  encuestadorId: int("encuestadorId").notNull(),
+  // Fecha del turno (YYYY-MM-DD)
+  shiftDate: varchar("shiftDate", { length: 10 }).notNull(),
+  // Hora de inicio y fin (HH:MM)
+  startTime: varchar("startTime", { length: 5 }).notNull(),
+  endTime: varchar("endTime", { length: 5 }).notNull(),
+  // Punto de encuesta asignado
+  surveyPoint: varchar("surveyPoint", { length: 255 }),
+  // Tipo de encuesta asignada
+  surveyType: mysqlEnum("surveyType", ["visitantes", "residentes", "conteo"]),
+  // Notas del turno (instrucciones, observaciones del admin)
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Shift = typeof shifts.$inferSelect;
+export type InsertShift = typeof shifts.$inferInsert;
+
+// ─── Cierre de turno ──────────────────────────────────────────────────────────
+/**
+ * Registro de cierre de turno por parte del encuestador.
+ * Incluye resumen de la jornada e incidencias.
+ */
+export const shiftClosures = mysqlTable("shift_closures", {
+  id: int("id").autoincrement().primaryKey(),
+  encuestadorId: int("encuestadorId").notNull(),
+  encuestadorName: varchar("encuestadorName", { length: 255 }),
+  shiftId: int("shiftId"), // Puede ser null si el turno no está asignado en BD
+  // Fecha y hora de cierre
+  closedAt: timestamp("closedAt").notNull(),
+  // Resumen del turno
+  totalEncuestas: int("totalEncuestas").default(0).notNull(),
+  totalConteos: int("totalConteos").default(0),
+  totalRechazos: int("totalRechazos").default(0),
+  // Punto de trabajo
+  surveyPoint: varchar("surveyPoint", { length: 255 }),
+  surveyType: mysqlEnum("surveyType", ["visitantes", "residentes", "conteo"]),
+  // Incidencias y observaciones
+  incidencias: text("incidencias"),
+  // Valoración del turno (1-5)
+  valoracion: int("valoracion"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ShiftClosure = typeof shiftClosures.$inferSelect;
+export type InsertShiftClosure = typeof shiftClosures.$inferInsert;

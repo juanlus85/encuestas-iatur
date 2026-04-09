@@ -154,3 +154,14 @@
 - [x] Causa: appId y name vacios en JWT cuando VITE_APP_ID no esta configurado en VPS
 - [x] Corregido: createSessionToken usa 'local-app' como fallback; verifySession no requiere name no-vacio
 - [x] Reinstalado vite-plugin-pwa que faltaba en node_modules
+
+## Mejoras mayores (10 Abril 2026)
+- [x] 1. Encuestas definitivas: actualizar preguntas de residentes y visitantes con los .docx adjuntos
+- [x] 2. Puntos de conteo con subpuntos y flujos bidireccionales (01.Virgen Reyes → 01.01 Alemanes, etc.)
+- [x] 3. Cuotas con dashboard de progreso para encuestadores (visitantes: 450 total, residentes: 300 total)
+- [x] 4. Logos institucionales (NO8DO Ayuntamiento Sevilla + Sevilla FeelingLAND) en la app
+- [x] 5. Turnos/horarios: admin asigna turnos, encuestador ve los suyos
+- [x] 6. Cierre de turno: resumen del turno + campo de incidencias
+- [x] 7. Modo offline: almacenamiento local (IndexedDB) + sincronización al recuperar conexión
+- [x] 8. Rol revisor: acceso de solo lectura a encuestas, estadísticas, mapas, exportación y localización en tiempo real de encuestadores
+- [x] Corregir subpuntos de todos los puntos de conteo (cada punto principal debe tener todos sus subpuntos con flujos bidireccionales correctos)

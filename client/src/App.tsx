@@ -18,6 +18,8 @@ import ConteoPeatonal from "./pages/ConteoPeatonal";
 import ConteoResultados from "./pages/ConteoResultados";
 import ConteoSentidos from "./pages/ConteoSentidos";
 import MapaConteos from "./pages/MapaConteos";
+import Cuotas from "./pages/Cuotas";
+import CierreTurno from "./pages/CierreTurno";
 
 // Resetea el scroll al inicio en cada cambio de ruta (fix para móvil)
 function ScrollToTop() {
@@ -50,6 +52,8 @@ function Router() {
         <Route path="/conteo-resultados" component={ConteoResultados} />
         <Route path="/conteo-sentidos" component={ConteoSentidos} />
         <Route path="/mapa-conteos" component={MapaConteos} />
+        <Route path="/cuotas" component={Cuotas} />
+        <Route path="/cierre-turno" component={CierreTurno} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

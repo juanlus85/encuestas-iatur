@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { nanoid } from "nanoid";
-import { Eye, EyeOff, KeyRound, Loader2, Plus, Shield, User, UserCheck } from "lucide-react";
+import { Calendar, Eye, EyeOff, KeyRound, Loader2, Plus, Shield, Trash2, User, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -31,7 +31,169 @@ const ROLE_ICONS: Record<string, any> = {
   user: User,
 };
 
-// ─── Set Password Dialog ──────────────────────────────────────────────────────
+// ─── Gestión de Turnos ────────────────────────────────────────────────────────────────
+
+const SURVEY_POINTS_LABELS = [
+  "01 Virgen de los Reyes",
+  "02 Mateos Gago",
+  "03 Patio de Banderas",
+  "04 Agua / Vida",
+  "05 Plaza Alfaro",
+];
+
+function TurnosSection({ encuestadores }: { encuestadores: { id: number; name: string | null }[] }) {
+  const utils = trpc.useUtils();
+  const { data: shifts, isLoading: shiftsLoading } = trpc.shifts.getAll.useQuery();
+  const createMutation = trpc.shifts.create.useMutation({
+    onSuccess: () => { utils.shifts.getAll.invalidate(); toast.success("Turno creado"); setOpen(false); resetForm(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteMutation = trpc.shifts.delete.useMutation({
+    onSuccess: () => { utils.shifts.getAll.invalidate(); toast.success("Turno eliminado"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [open, setOpen] = useState(false);
+  const [encuestadorId, setEncuestadorId] = useState("");
+  const [shiftDate, setShiftDate] = useState("");
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("14:00");
+  const [surveyPoint, setSurveyPoint] = useState("");
+  const [surveyType, setSurveyType] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const resetForm = () => {
+    setEncuestadorId(""); setShiftDate(""); setStartTime("09:00"); setEndTime("14:00");
+    setSurveyPoint(""); setSurveyType(""); setNotes("");
+  };
+
+  const handleCreate = () => {
+    if (!encuestadorId || !shiftDate) { toast.error("Selecciona encuestador y fecha"); return; }
+    createMutation.mutate({
+      encuestadorId: Number(encuestadorId),
+      shiftDate, startTime, endTime,
+      surveyPoint: surveyPoint || undefined,
+      surveyType: (surveyType as any) || undefined,
+      notes: notes || undefined,
+    });
+  };
+
+  // Agrupar por fecha
+  const byDate: Record<string, typeof shifts> = {};
+  for (const s of shifts ?? []) {
+    if (!byDate[s.shiftDate]) byDate[s.shiftDate] = [];
+    byDate[s.shiftDate]!.push(s);
+  }
+  const sortedDates = Object.keys(byDate).sort().reverse();
+
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" />
+            Turnos asignados
+          </CardTitle>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Plus className="h-4 w-4 mr-1" /> Añadir turno
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader><DialogTitle>Nuevo turno</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div>
+                  <Label>Encuestador</Label>
+                  <select value={encuestadorId} onChange={(e) => setEncuestadorId(e.target.value)}
+                    className="w-full border border-border rounded-lg px-3 py-2 text-sm mt-1 bg-background">
+                    <option value="">Seleccionar...</option>
+                    {encuestadores.map((e) => <option key={e.id} value={e.id}>{e.name ?? `ID ${e.id}`}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Fecha</Label>
+                  <Input type="date" value={shiftDate} onChange={(e) => setShiftDate(e.target.value)} className="mt-1" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Hora inicio</Label><Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-1" /></div>
+                  <div><Label>Hora fin</Label><Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="mt-1" /></div>
+                </div>
+                <div>
+                  <Label>Punto de encuesta</Label>
+                  <select value={surveyPoint} onChange={(e) => setSurveyPoint(e.target.value)}
+                    className="w-full border border-border rounded-lg px-3 py-2 text-sm mt-1 bg-background">
+                    <option value="">Sin asignar</option>
+                    {SURVEY_POINTS_LABELS.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Tipo de trabajo</Label>
+                  <select value={surveyType} onChange={(e) => setSurveyType(e.target.value)}
+                    className="w-full border border-border rounded-lg px-3 py-2 text-sm mt-1 bg-background">
+                    <option value="">Sin asignar</option>
+                    <option value="visitantes">Visitantes</option>
+                    <option value="residentes">Residentes</option>
+                    <option value="conteo">Conteo peatonal</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>Notas / Instrucciones</Label>
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+                    className="w-full border border-border rounded-lg px-3 py-2 text-sm mt-1 bg-background resize-none" />
+                </div>
+                <Button onClick={handleCreate} disabled={createMutation.isPending} className="w-full">
+                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear turno"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {shiftsLoading && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>}
+        {!shiftsLoading && sortedDates.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">No hay turnos asignados. Crea el primero.</p>
+        )}
+        <div className="space-y-4">
+          {sortedDates.map((date) => (
+            <div key={date}>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                {new Date(date + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
+              </p>
+              <div className="space-y-2">
+                {byDate[date]!.map((s) => {
+                  const enc = encuestadores.find((e) => e.id === s.encuestadorId);
+                  return (
+                    <div key={s.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{enc?.name ?? `ID ${s.encuestadorId}`}</p>
+                        <p className="text-xs text-gray-500">
+                          {s.startTime} – {s.endTime}
+                          {s.surveyPoint && ` · ${s.surveyPoint}`}
+                          {s.surveyType && ` · ${s.surveyType}`}
+                        </p>
+                        {s.notes && <p className="text-xs text-gray-400 mt-0.5">{s.notes}</p>}
+                      </div>
+                      <button
+                        onClick={() => deleteMutation.mutate({ id: s.id })}
+                        className="text-red-400 hover:text-red-600 transition-colors p-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Set Password Dialog ────────────────────────────────────────────────────────────────
 
 function SetPasswordDialog({ userId, userName }: { userId: number; userName: string }) {
   const [open, setOpen] = useState(false);
@@ -437,6 +599,9 @@ export default function Usuarios() {
             <p className="text-sm">No hay usuarios creados. Cree el primer encuestador.</p>
           </div>
         )}
+
+        {/* Sección de turnos */}
+        <TurnosSection encuestadores={encuestadores} />
       </div>
     </DashboardLayout>
   );

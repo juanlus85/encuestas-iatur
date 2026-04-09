@@ -6,15 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Users, MapPin, Clock, TrendingUp, Calendar } from "lucide-react";
+import { SURVEY_POINTS as SP } from "../../../shared/surveyPoints";
 
-const SURVEY_POINTS = [
-  "Todos",
-  "Mateos Gago",
-  "Agua / Vida",
-  "Plaza de Alfaro",
-  "Virgen de los Reyes",
-  "Patio de Banderas",
-];
+const SURVEY_POINTS = ["Todos", ...SP.map((p) => p.fullName)];
 
 const TIME_GRANULARITIES = [
   { value: "hour", label: "Por hora" },

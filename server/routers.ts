@@ -19,6 +19,7 @@ import {
   getEncuestadores,
   getFieldMetrics,
   getGpsLocations,
+  getLatestEncuestadorLocations,
   getIntervalsBySession,
   getPedestrianSessionById,
   getPedestrianSessions,
@@ -50,10 +51,27 @@ import {
   createSurveyRejection,
   getSurveyRejections,
   getSurveyRejectionStats,
+  createShift,
+  getAllShifts,
+  getShiftsByEncuestador,
+  updateShift,
+  deleteShift,
+  createShiftClosure,
+  getShiftClosuresByEncuestador,
+  getAllShiftClosures,
 } from "./db";
 import { hashPassword } from "./_core/localAuth";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
+import {
+  VISITANTES_QUOTAS,
+  RESIDENTES_QUOTAS,
+  VISITANTES_QUESTION_IDS,
+  RESIDENTES_QUESTION_IDS,
+  clasificarProcedencia,
+  clasificarEdadResidente,
+  tieneVinculoTurismo,
+} from "@shared/quotas";
 
 // ─── Middleware helpers ───────────────────────────────────────────────────────
 
@@ -418,9 +436,10 @@ export const appRouter = router({
         encuestadorId: z.number().optional(),
       }).optional())
       .query(({ input }) => getGpsLocations(input)),
+    latestLocations: adminOrRevisorProcedure
+      .query(() => getLatestEncuestadorLocations()),
   }),
-
-  // ─── Conteo Peatonal ───────────────────────────────────────────────────────────────────────────────
+  // ─── Conteo Peatonall ───────────────────────────────────────────────────────────────────────────────
 
   pedestrian: router({
     createSession: encuestadorProcedure
@@ -783,6 +802,182 @@ export const appRouter = router({
         const csvLines = [headers.map(escape).join(","), ...rows.map((row) => row.map(escape).join(","))];
         return { csv: csvLines.join("\n"), count: rows.length };
       }),
+  }),
+  // ─── Turnos ────────────────────────────────────────────────────────────────
+  shifts: router({
+    // Admin: ver todos los turnos
+    getAll: adminProcedure.query(() => getAllShifts()),
+    // Encuestador: ver mis turnos
+    getMine: protectedProcedure.query(({ ctx }) => getShiftsByEncuestador(ctx.user.id)),
+    // Admin: crear turno
+    create: adminProcedure
+      .input(z.object({
+        encuestadorId: z.number(),
+        shiftDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        startTime: z.string().regex(/^\d{2}:\d{2}$/),
+        endTime: z.string().regex(/^\d{2}:\d{2}$/),
+        surveyPoint: z.string().optional(),
+        surveyType: z.enum(["visitantes", "residentes", "conteo"]).optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(({ input }) => createShift(input)),
+    // Admin: actualizar turno
+    update: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        shiftDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+        endTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+        surveyPoint: z.string().optional(),
+        surveyType: z.enum(["visitantes", "residentes", "conteo"]).optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(({ input }) => {
+        const { id, ...data } = input;
+        return updateShift(id, data);
+      }),
+    // Admin: eliminar turno
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => deleteShift(input.id)),
+  }),
+
+  // ─── Cierre de turno ────────────────────────────────────────────────────────────────
+  shiftClosures: router({
+    // Encuestador: registrar cierre de turno
+    close: protectedProcedure
+      .input(z.object({
+        shiftId: z.number().optional(),
+        totalEncuestas: z.number().min(0),
+        totalConteos: z.number().min(0).optional(),
+        totalRechazos: z.number().min(0).optional(),
+        surveyPoint: z.string().optional(),
+        surveyType: z.enum(["visitantes", "residentes", "conteo"]).optional(),
+        incidencias: z.string().optional(),
+        valoracion: z.number().min(1).max(5).optional(),
+      }))
+      .mutation(({ ctx, input }) =>
+        createShiftClosure({
+          encuestadorId: ctx.user.id,
+          encuestadorName: ctx.user.name ?? undefined,
+          closedAt: new Date(),
+          ...input,
+        })
+      ),
+    // Encuestador: ver mis cierres
+    getMine: protectedProcedure.query(({ ctx }) =>
+      getShiftClosuresByEncuestador(ctx.user.id)
+    ),
+    // Admin/Revisor: ver todos los cierres
+    getAll: adminOrRevisorProcedure.query(() => getAllShiftClosures()),
+  }),
+
+  // ─── Cuotas ────────────────────────────────────────────────────────────────
+  quotas: router({
+    /**
+     * Devuelve el progreso actual de cuotas para visitantes y residentes.
+     * Accesible por encuestadores, revisores y admins.
+     */
+    progress: protectedProcedure.query(async () => {
+      // Obtener todas las respuestas completas
+      const allResponses = await getSurveyResponses({ status: "completa" });
+
+      // ─── VISITANTES ───────────────────────────────────────────────────────
+      const visitantesResponses = allResponses.filter((r) => r.templateId === 60001);
+
+      // Género visitantes
+      const vGenero: Record<string, number> = { hombre: 0, mujer: 0, otro: 0 };
+      // Procedencia visitantes
+      const vProcedencia: Record<string, number> = { sevilla: 0, nacional: 0, extranjero: 0 };
+      // Por punto
+      const vPuntos: Record<string, number> = {};
+
+      for (const r of visitantesResponses) {
+        const answers = (r.answers as Array<{ questionId: number; answer: any }>) ?? [];
+        const getAnswer = (qId: number) => answers.find((a) => a.questionId === qId)?.answer;
+
+        // Género
+        const genero = getAnswer(VISITANTES_QUESTION_IDS.genero);
+        if (genero === "hombre") vGenero.hombre++;
+        else if (genero === "mujer") vGenero.mujer++;
+        else vGenero.otro++;
+
+        // Procedencia
+        const pais = getAnswer(VISITANTES_QUESTION_IDS.pais) ?? "";
+        const provinciaEsp = getAnswer(VISITANTES_QUESTION_IDS.paisEsp) ?? "";
+        const proc = clasificarProcedencia(pais, provinciaEsp);
+        vProcedencia[proc] = (vProcedencia[proc] ?? 0) + 1;
+
+        // Punto
+        const punto = r.surveyPoint ?? "Sin punto";
+        vPuntos[punto] = (vPuntos[punto] ?? 0) + 1;
+      }
+
+      // ─── RESIDENTES ───────────────────────────────────────────────────────
+      const residentesResponses = allResponses.filter((r) => r.templateId === 60002);
+
+      const rGenero: Record<string, number> = { hombre: 0, mujer: 0, otro: 0 };
+      const rEdad: Record<string, number> = { "18_44": 0, "45_65": 0, "65_mas": 0 };
+      const rVinculo: Record<string, number> = { con_vinculo: 0, sin_vinculo: 0 };
+
+      for (const r of residentesResponses) {
+        const answers = (r.answers as Array<{ questionId: number; answer: any }>) ?? [];
+        const getAnswer = (qId: number) => answers.find((a) => a.questionId === qId)?.answer;
+
+        // Género
+        const genero = getAnswer(RESIDENTES_QUESTION_IDS.genero);
+        if (genero === "hombre") rGenero.hombre++;
+        else if (genero === "mujer") rGenero.mujer++;
+        else rGenero.otro++;
+
+        // Edad
+        const edad = getAnswer(RESIDENTES_QUESTION_IDS.edad);
+        const edadGrupo = clasificarEdadResidente(edad ?? "");
+        if (edadGrupo) rEdad[edadGrupo]++;
+
+        // Vínculo laboral
+        const vinculo = getAnswer(RESIDENTES_QUESTION_IDS.vinculo);
+        if (tieneVinculoTurismo(vinculo ?? "")) rVinculo.con_vinculo++;
+        else rVinculo.sin_vinculo++;
+      }
+
+      return {
+        visitantes: {
+          total: { current: visitantesResponses.length, target: VISITANTES_QUOTAS.total },
+          genero: {
+            hombre: { current: vGenero.hombre, target: VISITANTES_QUOTAS.genero.hombre.target, label: VISITANTES_QUOTAS.genero.hombre.label },
+            mujer: { current: vGenero.mujer, target: VISITANTES_QUOTAS.genero.mujer.target, label: VISITANTES_QUOTAS.genero.mujer.label },
+          },
+          procedencia: {
+            sevilla: { current: vProcedencia.sevilla, target: VISITANTES_QUOTAS.procedencia.sevilla.target, label: VISITANTES_QUOTAS.procedencia.sevilla.label },
+            nacional: { current: vProcedencia.nacional, target: VISITANTES_QUOTAS.procedencia.nacional.target, label: VISITANTES_QUOTAS.procedencia.nacional.label },
+            extranjero: { current: vProcedencia.extranjero, target: VISITANTES_QUOTAS.procedencia.extranjero.target, label: VISITANTES_QUOTAS.procedencia.extranjero.label },
+          },
+          puntos: Object.entries(VISITANTES_QUOTAS.puntos).map(([key, q]) => ({
+            key,
+            label: q.label,
+            current: vPuntos[key] ?? 0,
+            target: q.target,
+          })),
+        },
+        residentes: {
+          total: { current: residentesResponses.length, target: RESIDENTES_QUOTAS.total },
+          genero: {
+            hombre: { current: rGenero.hombre, target: RESIDENTES_QUOTAS.genero.hombre.target, label: RESIDENTES_QUOTAS.genero.hombre.label },
+            mujer: { current: rGenero.mujer, target: RESIDENTES_QUOTAS.genero.mujer.target, label: RESIDENTES_QUOTAS.genero.mujer.label },
+          },
+          edad: {
+            "18_44": { current: rEdad["18_44"], target: RESIDENTES_QUOTAS.edad["18_44"].target, label: RESIDENTES_QUOTAS.edad["18_44"].label },
+            "45_65": { current: rEdad["45_65"], target: RESIDENTES_QUOTAS.edad["45_65"].target, label: RESIDENTES_QUOTAS.edad["45_65"].label },
+            "65_mas": { current: rEdad["65_mas"], target: RESIDENTES_QUOTAS.edad["65_mas"].target, label: RESIDENTES_QUOTAS.edad["65_mas"].label },
+          },
+          vinculo: {
+            con_vinculo: { current: rVinculo.con_vinculo, target: RESIDENTES_QUOTAS.vinculo.con_vinculo.target, label: RESIDENTES_QUOTAS.vinculo.con_vinculo.label },
+            sin_vinculo: { current: rVinculo.sin_vinculo, target: RESIDENTES_QUOTAS.vinculo.sin_vinculo.target, label: RESIDENTES_QUOTAS.vinculo.sin_vinculo.label },
+          },
+        },
+      };
+    }),
   }),
 });
 export type AppRouter = typeof appRouter;

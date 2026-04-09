@@ -1,0 +1,393 @@
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  MapPin,
+  Star,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+} from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import DashboardLayout from "@/components/DashboardLayout";
+
+// ─── Componente de estrella de valoración ─────────────────────────────────────
+
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onMouseEnter={() => setHover(star)}
+          onMouseLeave={() => setHover(0)}
+          onClick={() => onChange(star)}
+          className="focus:outline-none"
+        >
+          <Star
+            className={`h-8 w-8 transition-colors ${
+              star <= (hover || value)
+                ? "fill-amber-400 text-amber-400"
+                : "text-gray-300"
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Historial de cierres ─────────────────────────────────────────────────────
+
+function HistorialCierres() {
+  const { data: cierres, isLoading } = trpc.shiftClosures.getMine.useQuery();
+  const [expanded, setExpanded] = useState(false);
+
+  if (isLoading) return <div className="text-sm text-gray-400 text-center py-4">Cargando historial...</div>;
+  if (!cierres?.length) return <div className="text-sm text-gray-400 text-center py-4">No hay cierres registrados aún.</div>;
+
+  const shown = expanded ? cierres : cierres.slice(0, 3);
+
+  return (
+    <div className="space-y-3">
+      {shown.map((c) => {
+        const dt = new Date(c.closedAt);
+        return (
+          <div key={c.id} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-gray-800 text-sm">
+                  {dt.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Cierre: {dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                  {c.surveyPoint && ` · ${c.surveyPoint}`}
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                {c.surveyType && (
+                  <Badge variant="outline" className="text-xs capitalize">{c.surveyType}</Badge>
+                )}
+                {c.valoracion && (
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star key={s} className={`h-3 w-3 ${s <= c.valoracion! ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className="text-center bg-white rounded-lg py-2 border border-gray-100">
+                <p className="text-lg font-bold text-blue-700">{c.totalEncuestas}</p>
+                <p className="text-xs text-gray-500">Encuestas</p>
+              </div>
+              <div className="text-center bg-white rounded-lg py-2 border border-gray-100">
+                <p className="text-lg font-bold text-green-700">{c.totalConteos ?? 0}</p>
+                <p className="text-xs text-gray-500">Conteos</p>
+              </div>
+              <div className="text-center bg-white rounded-lg py-2 border border-gray-100">
+                <p className="text-lg font-bold text-red-600">{c.totalRechazos ?? 0}</p>
+                <p className="text-xs text-gray-500">Rechazos</p>
+              </div>
+            </div>
+            {c.incidencias && (
+              <div className="mt-3 bg-amber-50 rounded-lg p-3 border border-amber-100">
+                <p className="text-xs font-semibold text-amber-700 mb-1">Incidencias:</p>
+                <p className="text-xs text-amber-800">{c.incidencias}</p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {cierres.length > 3 && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full text-sm text-blue-600 font-medium flex items-center justify-center gap-1 py-2"
+        >
+          {expanded ? <><ChevronUp className="h-4 w-4" /> Ver menos</> : <><ChevronDown className="h-4 w-4" /> Ver los {cierres.length - 3} anteriores</>}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Página principal ─────────────────────────────────────────────────────────
+
+export default function CierreTurno() {
+  const { user } = useAuth();
+  const utils = trpc.useUtils();
+
+  // Datos del turno actual (encuestas y rechazos del día)
+  const { data: myShifts } = trpc.shifts.getMine.useQuery();
+
+  const closeMutation = trpc.shiftClosures.close.useMutation({
+    onSuccess: () => {
+      toast.success("Turno cerrado correctamente. ¡Buen trabajo!");
+      utils.shiftClosures.getMine.invalidate();
+      setSubmitted(true);
+    },
+    onError: (e) => toast.error(`Error al cerrar turno: ${e.message}`),
+  });
+
+  // Estado del formulario
+  const [surveyPoint, setSurveyPoint] = useState("");
+  const [surveyType, setSurveyType] = useState<"visitantes" | "residentes" | "conteo" | "">("")
+  const [incidencias, setIncidencias] = useState("");
+  const [valoracion, setValoracion] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
+  const [totalEncuestasManual, setTotalEncuestasManual] = useState(0);
+  const [totalConteosManual, setTotalConteosManual] = useState(0);
+  const [totalRechazosManual, setTotalRechazosManual] = useState(0);
+
+  // Calcular estadísticas del día
+  const today = new Date().toISOString().split("T")[0];
+  const totalEncuestas = totalEncuestasManual;
+  const totalRechazos = totalRechazosManual;
+
+  // Turno de hoy
+  const todayShift = (myShifts ?? []).find((s) => s.shiftDate === today);
+
+  const handleClose = () => {
+    if (!surveyType) {
+      toast.error("Selecciona el tipo de encuesta realizada");
+      return;
+    }
+    closeMutation.mutate({
+      shiftId: todayShift?.id,
+      totalEncuestas: totalEncuestasManual,
+      totalConteos: totalConteosManual,
+      totalRechazos: totalRechazosManual,
+      surveyPoint: surveyPoint || todayShift?.surveyPoint || undefined,
+      surveyType: surveyType as "visitantes" | "residentes" | "conteo",
+      incidencias: incidencias || undefined,
+      valoracion: valoracion || undefined,
+    });
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-6">
+        {/* Cabecera */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Cierre de Turno</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            {new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+          </p>
+        </div>
+
+        {/* Turno asignado hoy */}
+        {todayShift && (
+          <Card className="border-blue-100 bg-blue-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Calendar className="h-5 w-5 text-blue-600 shrink-0" />
+                <div>
+                  <p className="font-semibold text-blue-800 text-sm">Turno asignado hoy</p>
+                  <p className="text-blue-600 text-sm">
+                    {todayShift.startTime} – {todayShift.endTime}
+                    {todayShift.surveyPoint && ` · ${todayShift.surveyPoint}`}
+                    {todayShift.surveyType && ` · ${todayShift.surveyType}`}
+                  </p>
+                  {todayShift.notes && (
+                    <p className="text-blue-500 text-xs mt-1">{todayShift.notes}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Resumen del día */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-blue-600" />
+              Resumen de hoy
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center bg-blue-50 rounded-xl py-4 border border-blue-100">
+                <input
+                  type="number"
+                  min={0}
+                  value={totalEncuestasManual}
+                  onChange={(e) => setTotalEncuestasManual(Number(e.target.value))}
+                  className="text-3xl font-bold text-blue-700 bg-transparent text-center w-full focus:outline-none"
+                />
+                <p className="text-xs text-blue-600 font-medium mt-1">Encuestas</p>
+              </div>
+              <div className="text-center bg-green-50 rounded-xl py-4 border border-green-100">
+                <input
+                  type="number"
+                  min={0}
+                  value={totalConteosManual}
+                  onChange={(e) => setTotalConteosManual(Number(e.target.value))}
+                  className="text-3xl font-bold text-green-700 bg-transparent text-center w-full focus:outline-none"
+                />
+                <p className="text-xs text-green-600 font-medium mt-1">Conteos</p>
+              </div>
+              <div className="text-center bg-red-50 rounded-xl py-4 border border-red-100">
+                <input
+                  type="number"
+                  min={0}
+                  value={totalRechazosManual}
+                  onChange={(e) => setTotalRechazosManual(Number(e.target.value))}
+                  className="text-3xl font-bold text-red-600 bg-transparent text-center w-full focus:outline-none"
+                />
+                <p className="text-xs text-red-600 font-medium mt-1">Rechazos</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 text-center mt-3">
+              Introduce los totales del turno de hoy
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Formulario de cierre */}
+        {!submitted ? (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="h-4 w-4 text-amber-600" />
+                Registrar cierre de turno
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* Punto de encuesta */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  <MapPin className="h-4 w-4 inline mr-1 text-gray-500" />
+                  Punto de trabajo
+                </label>
+                <select
+                  value={surveyPoint}
+                  onChange={(e) => setSurveyPoint(e.target.value)}
+                  className="w-full border border-border rounded-lg px-4 py-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Seleccionar punto...</option>
+                  <option value="01 Virgen de los Reyes">01 Virgen de los Reyes</option>
+                  <option value="02 Mateos Gago">02 Mateos Gago</option>
+                  <option value="03 Patio de Banderas">03 Patio de Banderas</option>
+                  <option value="04 Agua / Vida">04 Agua / Vida</option>
+                  <option value="05 Plaza Alfaro">05 Plaza Alfaro</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+
+              {/* Tipo de encuesta */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  Tipo de trabajo realizado <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { val: "visitantes", label: "Visitantes" },
+                    { val: "residentes", label: "Residentes" },
+                    { val: "conteo", label: "Conteo" },
+                  ].map(({ val, label }) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setSurveyType(val as any)}
+                      className={`py-3 rounded-xl border-2 font-medium text-sm transition-all ${
+                        surveyType === val
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "border-gray-200 hover:border-blue-300 text-gray-700"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Incidencias */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  <AlertTriangle className="h-4 w-4 inline mr-1 text-amber-500" />
+                  Incidencias, problemas o comentarios
+                </label>
+                <textarea
+                  value={incidencias}
+                  onChange={(e) => setIncidencias(e.target.value)}
+                  rows={4}
+                  placeholder="Describe cualquier incidencia, problema técnico, situación especial, o comentario sobre el turno..."
+                  className="w-full border border-border rounded-lg px-4 py-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                />
+              </div>
+
+              {/* Valoración */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-3">
+                  <Star className="h-4 w-4 inline mr-1 text-amber-400" />
+                  Valoración del turno
+                </label>
+                <StarRating value={valoracion} onChange={setValoracion} />
+                {valoracion > 0 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    {["", "Muy difícil", "Difícil", "Normal", "Bueno", "Excelente"][valoracion]}
+                  </p>
+                )}
+              </div>
+
+              {/* Botón de cierre */}
+              <Button
+                onClick={handleClose}
+                disabled={closeMutation.isPending || !surveyType}
+                className="w-full h-12 text-base font-semibold bg-blue-700 hover:bg-blue-800"
+              >
+                {closeMutation.isPending ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                    Cerrar turno
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="p-6 text-center">
+              <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-green-800">Turno cerrado correctamente</h3>
+              <p className="text-green-600 text-sm mt-1">¡Gracias por tu trabajo hoy!</p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => setSubmitted(false)}
+              >
+                Registrar otro cierre
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Historial */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              Historial de cierres
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <HistorialCierres />
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
+}
