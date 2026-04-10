@@ -97,13 +97,19 @@ function CuotasContent({
   data,
   refetch,
   isFetching,
+  surveyTypeFilter,
 }: {
   data: any;
   refetch: () => void;
   isFetching: boolean;
+  surveyTypeFilter?: "visitantes" | "residentes" | "ambos" | null;
 }) {
-  const v = data?.visitantes;
-  const r = data?.residentes;
+  // Si el encuestador tiene tipo asignado, filtrar; si es "ambos" o admin, mostrar todo
+  const showVisitantes = !surveyTypeFilter || surveyTypeFilter === "ambos" || surveyTypeFilter === "visitantes";
+  const showResidentes = !surveyTypeFilter || surveyTypeFilter === "ambos" || surveyTypeFilter === "residentes";
+
+  const v = showVisitantes ? data?.visitantes : null;
+  const r = showResidentes ? data?.residentes : null;
 
   return (
     <div className="space-y-6">
@@ -253,10 +259,15 @@ export default function Cuotas() {
     return <DashboardLayout><div className="p-6">{spinner}</div></DashboardLayout>;
   }
 
+  // Tipo asignado al encuestador (si aplica)
+  const surveyTypeFilter = isEncuestador
+    ? ((user as any)?.surveyTypeAssigned ?? "ambos")
+    : null;
+
   if (isEncuestador) {
     return (
       <EncuestadorLayout title="Cuotas">
-        <CuotasContent data={data} refetch={refetch} isFetching={isFetching} />
+        <CuotasContent data={data} refetch={refetch} isFetching={isFetching} surveyTypeFilter={surveyTypeFilter} />
       </EncuestadorLayout>
     );
   }
