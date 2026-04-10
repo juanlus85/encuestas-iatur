@@ -14,7 +14,7 @@ export default function ConteoPeatonal() {
   const [step, setStep] = useState<"punto" | "conteo">("punto");
   const [selectedPoint, setSelectedPoint] = useState<SurveyPoint | null>(null);
   const [selectedCount, setSelectedCount] = useState<number | null>(null);
-  const [selectedFlow, setSelectedFlow] = useState<{ label: string; from: string; to: string } | null>(null);
+  const [selectedFlow, setSelectedFlow] = useState<{ label: string; from: string; to: string; fromCode: string; toCode: string } | null>(null);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupCount, setGroupCount] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number; acc: number } | null>(null);
@@ -60,11 +60,11 @@ export default function ConteoPeatonal() {
       return;
     }
     addPass.mutate({
-      surveyPoint: selectedPoint.fullName,       // nombre completo para mostrar
-      surveyPointCode: selectedPoint.code,        // solo código para BD
+      surveyPoint: selectedPoint.fullName,        // nombre completo para mostrar en panel admin
+      surveyPointCode: selectedPoint.code,         // solo código para BD (ej: "01")
       directionLabel: selectedFlow.label,
-      flowOrigin: selectedFlow.from,              // origen del flujo
-      flowDestination: selectedFlow.to,           // destino del flujo
+      flowOrigin: selectedFlow.fromCode,           // solo código origen (ej: "01")
+      flowDestination: selectedFlow.toCode,        // solo código destino (ej: "01.01")
       count: selectedCount,
       latitude: gps?.lat,
       longitude: gps?.lng,

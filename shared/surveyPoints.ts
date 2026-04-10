@@ -102,18 +102,22 @@ export function getSurveyPointByName(name: string): SurveyPoint | undefined {
  * Cada flujo es: "PUNTO_PRINCIPAL → SUBPUNTO" y "SUBPUNTO → PUNTO_PRINCIPAL"
  * Resultado: 2 flujos por subpunto (ej: 4 subpuntos → 8 flujos)
  */
-export function getFlowsForPoint(point: SurveyPoint): { label: string; from: string; to: string }[] {
-  const flows: { label: string; from: string; to: string }[] = [];
+export function getFlowsForPoint(point: SurveyPoint): { label: string; from: string; to: string; fromCode: string; toCode: string }[] {
+  const flows: { label: string; from: string; to: string; fromCode: string; toCode: string }[] = [];
   for (const sub of point.subPoints) {
     flows.push({
       label: `${point.fullName} → ${sub.fullName}`,
       from: point.fullName,
       to: sub.fullName,
+      fromCode: point.code,
+      toCode: sub.code,
     });
     flows.push({
       label: `${sub.fullName} → ${point.fullName}`,
       from: sub.fullName,
       to: point.fullName,
+      fromCode: sub.code,
+      toCode: point.code,
     });
   }
   return flows;

@@ -221,3 +221,7 @@
 - [x] Exportación CSV: usa columnas separadas (una por pregunta) en vez de JSON
 - [x] ConteoPeatonal.tsx: envía surveyPointCode, flowOrigin y flowDestination al servidor
 - [x] 21 tests pasando
+
+## Bug: Conteos sin corregir (11 abril - tarde)
+- [ ] ConteoPeatonal: guardar solo código del punto en BD (no "01 Virgen de los Reyes")
+- [ ] ConteoPeatonal: separar flowOrigin y flowDestination en campos distintos (no concatenados)
