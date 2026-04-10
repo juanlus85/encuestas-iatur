@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, Lock, User } from "lucide-react";
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -142,21 +141,7 @@ export default function Login() {
             </Button>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground">o</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
 
-          {/* Acceso institucional */}
-          <Button
-            variant="outline"
-            className="w-full h-11"
-            onClick={() => { window.location.href = getLoginUrl(); }}
-          >
-            Acceso institucional (administradores)
-          </Button>
         </div>
 
         <div className="flex flex-col items-center gap-3">

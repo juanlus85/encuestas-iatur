@@ -183,3 +183,10 @@
 - [ ] Pantalla de revisión de metadatos editable: mostrar franja, ventana, punto, idioma con valores automáticos ya rellenados pero editables antes de empezar preguntas
 - [ ] Dashboard de cuotas mejorado: mostrar claramente perfiles COMPLETOS (rojo/bloqueado, "NO buscar más") vs disponibles (verde, "Buscar este perfil")
 - [x] Mostrar preguntas en español e inglés simultáneamente (no botón de cambio, sino ambos textos visibles)
+
+## Bugs críticos (10 abril noche)
+- [x] Mapas no se ven en Mapa de Campo: Map.tsx ya usa clave directa AIzaSy... sin proxy Manus
+- [x] Encuestadores no ven el dashboard: corregido filtro templateType (usaba ID hardcodeado 60001/60002 en vez de 'visitantes'/'residentes')
+- [x] Error a.answer.map is not a function: parse defensivo en responses.byId (MySQL estándar devuelve JSON como string)
+- [x] Reestructurar BD: tabla survey_answers creada (una fila por pregunta), insertada automáticamente al guardar encuesta completa
+- [x] Eliminar botón 'Acceso institucional' del login (OAuth Manus)

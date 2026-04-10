@@ -355,3 +355,48 @@ export const shiftClosures = mysqlTable("shift_closures", {
 });
 export type ShiftClosure = typeof shiftClosures.$inferSelect;
 export type InsertShiftClosure = typeof shiftClosures.$inferInsert;
+
+// ─── Survey Answers (respuestas normalizadas por columna) ─────────────────────
+/**
+ * Tabla normalizada de respuestas: una fila por pregunta por encuesta.
+ * Facilita el análisis estadístico con SQL/Excel sin necesidad de parsear JSON.
+ * Se rellena automáticamente al guardar una encuesta completa.
+ *
+ * Columnas:
+ *   survey_id        → FK a survey_responses.id
+ *   question_code    → código de la pregunta (ej. "V01", "R15")
+ *   question_id      → ID numérico de la pregunta
+ *   question_text_es → texto de la pregunta en español
+ *   question_text_en → texto de la pregunta en inglés
+ *   answer_value     → valor de la respuesta (string, número, o JSON si es array)
+ *   answer_label_es  → etiqueta legible en español (para opciones de lista)
+ *   answer_label_en  → etiqueta legible en inglés
+ *   survey_type      → "visitantes" | "residentes"
+ *   survey_point     → punto de encuesta
+ *   encuestador_id   → FK a users.id
+ *   recorded_at      → timestamp de la encuesta
+ */
+export const surveyAnswers = mysqlTable("survey_answers", {
+  id: int("id").autoincrement().primaryKey(),
+  // FK a la encuesta principal
+  surveyId: int("surveyId").notNull(),
+  // Identificación de la pregunta
+  questionCode: varchar("questionCode", { length: 16 }).notNull(),   // ej. "V01", "R15"
+  questionId: int("questionId").notNull(),                            // ID numérico
+  questionTextEs: text("questionTextEs"),                             // texto ES
+  questionTextEn: text("questionTextEn"),                             // texto EN
+  // La respuesta
+  answerValue: text("answerValue"),                                   // valor crudo (string/número/JSON)
+  answerLabelEs: text("answerLabelEs"),                               // etiqueta legible ES
+  answerLabelEn: text("answerLabelEn"),                               // etiqueta legible EN
+  // Contexto de la encuesta (desnormalizado para consultas rápidas)
+  surveyType: mysqlEnum("surveyType", ["visitantes", "residentes"]).notNull(),
+  surveyPoint: varchar("surveyPoint", { length: 255 }),
+  encuestadorId: int("encuestadorId").notNull(),
+  encuestadorName: varchar("encuestadorName", { length: 255 }),
+  encuestadorIdentifier: varchar("encuestadorIdentifier", { length: 32 }),
+  recordedAt: timestamp("recordedAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SurveyAnswer = typeof surveyAnswers.$inferSelect;
+export type InsertSurveyAnswer = typeof surveyAnswers.$inferInsert;

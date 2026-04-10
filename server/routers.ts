@@ -59,6 +59,7 @@ import {
   createShiftClosure,
   getShiftClosuresByEncuestador,
   getAllShiftClosures,
+  insertSurveyAnswers,
 } from "./db";
 import { hashPassword } from "./_core/localAuth";
 import { storagePut } from "./storage";
@@ -299,7 +300,74 @@ export const appRouter = router({
           answers: input.answers,
           finishedAt: input.finishedAt ?? new Date(),
         });
-        return { success: true, id: result?.insertId };
+        const surveyId = result?.insertId as number | undefined;
+        // Si la encuesta se guardó correctamente y está completa, insertar en survey_answers
+        if (surveyId && input.status === "completa") {
+          try {
+            // Obtener las preguntas del template para enriquecer los datos
+            const templateQuestions = await getQuestionsByTemplate(input.templateId);
+            const qMap = new Map(templateQuestions.map((q) => [q.id, q]));
+            // Obtener el tipo de encuesta (visitantes/residentes)
+            const template = await getSurveyTemplateById(input.templateId);
+            const surveyType = (template?.type ?? "visitantes") as "visitantes" | "residentes";
+            const recordedAt = input.finishedAt ?? new Date();
+            const answerRows = input.answers.map((a, idx) => {
+              const q = qMap.get(a.questionId);
+              const opts = (q?.options as Array<{ value: string; label: string; labelEn?: string }> | null) ?? [];
+              // Convertir la respuesta a string (si es array, JSON)
+              const rawVal = a.answer;
+              let answerValue: string;
+              if (Array.isArray(rawVal)) {
+                answerValue = JSON.stringify(rawVal);
+              } else if (rawVal === null || rawVal === undefined) {
+                answerValue = "";
+              } else {
+                answerValue = String(rawVal);
+              }
+              // Buscar etiquetas legibles si es opción de lista
+              let labelEs: string | undefined;
+              let labelEn: string | undefined;
+              if (opts.length > 0) {
+                if (Array.isArray(rawVal)) {
+                  const labels = (rawVal as string[]).map((v) => {
+                    const opt = opts.find((o) => o.value === v);
+                    return opt ? { es: opt.label, en: opt.labelEn ?? opt.label } : { es: v, en: v };
+                  });
+                  labelEs = labels.map((l) => l.es).join(", ");
+                  labelEn = labels.map((l) => l.en).join(", ");
+                } else {
+                  const opt = opts.find((o) => o.value === String(rawVal));
+                  if (opt) { labelEs = opt.label; labelEn = opt.labelEn ?? opt.label; }
+                }
+              }
+              // Código de pregunta: "V" + orden para visitantes, "R" + orden para residentes
+              const prefix = surveyType === "visitantes" ? "V" : "R";
+              const order = q?.order ?? idx + 1;
+              const questionCode = `${prefix}${String(order).padStart(2, "0")}`;
+              return {
+                surveyId,
+                questionCode,
+                questionId: a.questionId,
+                questionTextEs: q?.text ?? "",
+                questionTextEn: q?.textEn ?? q?.text ?? "",
+                answerValue,
+                answerLabelEs: labelEs,
+                answerLabelEn: labelEn,
+                surveyType,
+                surveyPoint: input.surveyPoint,
+                encuestadorId: ctx.user.id,
+                encuestadorName: ctx.user.name ?? "",
+                encuestadorIdentifier: ctx.user.identifier ?? "",
+                recordedAt,
+              };
+            });
+            await insertSurveyAnswers(answerRows);
+          } catch (err) {
+            // No bloquear la respuesta si falla la inserción normalizada
+            console.error("[survey_answers] Error al insertar respuestas normalizadas:", err);
+          }
+        }
+        return { success: true, id: surveyId };
       }),
 
     list: adminOrRevisorProcedure
@@ -321,7 +389,12 @@ export const appRouter = router({
         const response = await getSurveyResponseById(input.id);
         if (!response) throw new TRPCError({ code: "NOT_FOUND" });
         const responsePhotos = await getPhotosByResponse(input.id);
-        return { ...response, photos: responsePhotos };
+        // Parse defensivo: en MySQL estándar (VPS) el campo JSON puede llegar como string
+        const rawAnswers = response.answers;
+        const parsedAnswers = typeof rawAnswers === "string"
+          ? (() => { try { return JSON.parse(rawAnswers); } catch { return []; } })()
+          : (Array.isArray(rawAnswers) ? rawAnswers : []);
+        return { ...response, answers: parsedAnswers, photos: responsePhotos };
       }),
   }),
 
@@ -883,7 +956,7 @@ export const appRouter = router({
       const allResponses = await getSurveyResponses({ status: "completa" });
 
       // ─── VISITANTES ───────────────────────────────────────────────────────
-      const visitantesResponses = allResponses.filter((r) => r.templateId === 60001);
+      const visitantesResponses = allResponses.filter((r) => r.templateType === "visitantes");
 
       // Género visitantes
       const vGenero: Record<string, number> = { hombre: 0, mujer: 0, otro: 0 };
@@ -915,7 +988,7 @@ export const appRouter = router({
       }
 
       // ─── RESIDENTES ───────────────────────────────────────────────────────
-      const residentesResponses = allResponses.filter((r) => r.templateId === 60002);
+      const residentesResponses = allResponses.filter((r) => r.templateType === "residentes");
 
       const rGenero: Record<string, number> = { hombre: 0, mujer: 0, otro: 0 };
       const rEdad: Record<string, number> = { "18_44": 0, "45_65": 0, "65_mas": 0 };

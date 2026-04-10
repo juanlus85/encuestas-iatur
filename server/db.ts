@@ -10,6 +10,8 @@ import {
   InsertUser,
   photos,
   questions,
+  surveyAnswers,
+  InsertSurveyAnswer,
   surveyResponses,
   surveyTemplates,
   users,
@@ -179,6 +181,20 @@ export async function createSurveyResponse(data: InsertSurveyResponse) {
   if (!db) return null;
   const result = await db.insert(surveyResponses).values(data);
   return result[0];
+}
+
+/**
+ * Inserta filas normalizadas en survey_answers (una por pregunta).
+ * Se llama desde el router de encuestas tras guardar la encuesta principal.
+ */
+export async function insertSurveyAnswers(rows: InsertSurveyAnswer[]) {
+  const db = await getDb();
+  if (!db || rows.length === 0) return;
+  // Insertar en lotes de 50 para evitar límites de MySQL
+  const BATCH = 50;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    await db.insert(surveyAnswers).values(rows.slice(i, i + BATCH));
+  }
 }
 
 export async function getSurveyResponses(filters?: {
