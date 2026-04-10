@@ -57,9 +57,11 @@ export default function Login() {
 
         {/* Logo / Branding */}
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
-            <span className="text-primary-foreground font-bold text-2xl tracking-tight">IA</span>
-          </div>
+          <img
+            src="https://d2xsxph8kpxj0f.cloudfront.net/310419663031419078/nHD7C8PRaURA7Ubm8Aop3k/logos-institucionales_324d47d4.jpg"
+            alt="Logos institucionales"
+            className="h-16 w-auto object-contain"
+          />
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">IATUR Encuestas</h1>
             <p className="text-sm text-muted-foreground mt-1">Sistema de Trabajo de Campo · Sevilla</p>
@@ -147,13 +149,13 @@ export default function Login() {
             <div className="flex-1 h-px bg-border" />
           </div>
 
-          {/* OAuth fallback */}
+          {/* Acceso institucional */}
           <Button
             variant="outline"
             className="w-full h-11"
             onClick={() => { window.location.href = getLoginUrl(); }}
           >
-            Acceso con cuenta Manus (administradores)
+            Acceso institucional (administradores)
           </Button>
         </div>
 

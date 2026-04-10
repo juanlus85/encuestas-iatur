@@ -112,28 +112,32 @@ function PhotoCapture({ onCapture, photos }: { onCapture: (data: PhotoData) => v
 
 function QuestionRenderer({
   question,
-  lang,
   answer,
   onAnswer,
   photos,
   onPhoto,
 }: {
   question: Question;
-  lang: "es" | "en";
+  lang?: "es" | "en"; // kept for compat but ignored — we show both
   answer: any;
   onAnswer: (val: any) => void;
   photos: PhotoData[];
   onPhoto: (data: PhotoData) => void;
 }) {
-  const text = lang === "en" && question.textEn ? question.textEn : question.text;
+  const textEs = question.text;
+  const textEn = question.textEn ?? "";
   const opts = question.options as QuestionOption[] | null | undefined ?? null;
 
   return (
     <div className="space-y-4">
+      {/* Question text — bilingual */}
       <div>
-        <p className="text-lg font-semibold text-foreground leading-snug">{text}</p>
+        <p className="text-lg font-semibold text-foreground leading-snug">{textEs}</p>
+        {textEn && (
+          <p className="text-sm text-muted-foreground italic mt-1 leading-snug">{textEn}</p>
+        )}
         {question.isRequired && (
-          <span className="text-xs text-destructive font-medium mt-1 inline-block">* Obligatorio</span>
+          <span className="text-xs text-destructive font-medium mt-1 inline-block">* Obligatorio / Required</span>
         )}
       </div>
 
@@ -141,7 +145,8 @@ function QuestionRenderer({
       {question.type === "single_choice" && opts && (
         <div className="space-y-2">
           {opts.map((opt) => {
-            const label = lang === "en" && opt.labelEn ? opt.labelEn : opt.label;
+            const labelEs = opt.label;
+            const labelEn = opt.labelEn ?? "";
             return (
               <button
                 key={opt.value}
@@ -155,7 +160,10 @@ function QuestionRenderer({
                   }`}>
                     {answer === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                   </div>
-                  <span className="text-sm">{label}</span>
+                  <div className="text-left">
+                    <span className="text-sm font-medium">{labelEs}</span>
+                    {labelEn && <span className="text-xs text-muted-foreground italic block">{labelEn}</span>}
+                  </div>
                 </div>
               </button>
             );
@@ -167,9 +175,9 @@ function QuestionRenderer({
       {question.type === "yes_no" && (
         <div className="grid grid-cols-2 gap-3">
           {[
-            { val: "si", label: lang === "en" ? "Yes" : "Sí" },
-            { val: "no", label: "No" },
-          ].map(({ val, label }) => (
+            { val: "si", labelEs: "Sí", labelEn: "Yes" },
+            { val: "no", labelEs: "No", labelEn: "No" },
+          ].map(({ val, labelEs, labelEn }) => (
             <button
               key={val}
               type="button"
@@ -180,7 +188,8 @@ function QuestionRenderer({
                   : "border-border hover:border-primary/50"
               }`}
             >
-              {label}
+              <span className="block">{labelEs}</span>
+              <span className="block text-xs font-normal opacity-75">{labelEn}</span>
             </button>
           ))}
         </div>
@@ -206,8 +215,8 @@ function QuestionRenderer({
             ))}
           </div>
           <div className="flex justify-between text-xs text-muted-foreground px-1">
-            <span>{lang === "en" ? "Very bad" : "Muy malo"}</span>
-            <span>{lang === "en" ? "Excellent" : "Excelente"}</span>
+            <span>Muy malo / Very bad</span>
+            <span>Excelente / Excellent</span>
           </div>
         </div>
       )}
@@ -219,7 +228,7 @@ function QuestionRenderer({
           value={answer ?? ""}
           onChange={(e) => onAnswer(e.target.value ? Number(e.target.value) : undefined)}
           className="w-full border border-border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-          placeholder="Introduzca un número..."
+          placeholder="Número / Number..."
         />
       )}
 
@@ -230,7 +239,7 @@ function QuestionRenderer({
           onChange={(e) => onAnswer(e.target.value)}
           rows={4}
           className="w-full border border-border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-ring bg-background resize-none"
-          placeholder={lang === "en" ? "Enter your answer..." : "Escriba su respuesta..."}
+          placeholder="Escriba su respuesta / Enter your answer..."
         />
       )}
 
@@ -238,7 +247,8 @@ function QuestionRenderer({
       {question.type === "multiple_choice" && opts && (
         <div className="space-y-2">
           {opts.map((opt) => {
-            const label = lang === "en" && opt.labelEn ? opt.labelEn : opt.label;
+            const labelEs = opt.label;
+            const labelEn = opt.labelEn ?? "";
             const selected = Array.isArray(answer) && answer.includes(opt.value);
             return (
               <button
@@ -256,7 +266,10 @@ function QuestionRenderer({
                   }`}>
                     {selected && <div className="w-2 h-1.5 border-l-2 border-b-2 border-white rotate-[-45deg] mt-[-1px]" />}
                   </div>
-                  <span className="text-sm">{label}</span>
+                  <div className="text-left">
+                    <span className="text-sm font-medium">{labelEs}</span>
+                    {labelEn && <span className="text-xs text-muted-foreground italic block">{labelEn}</span>}
+                  </div>
                 </div>
               </button>
             );
@@ -268,7 +281,7 @@ function QuestionRenderer({
       {question.requiresPhoto && (
         <div className="mt-4 pt-4 border-t border-border">
           <p className="text-sm font-medium text-muted-foreground mb-2">
-            {lang === "en" ? "Required photo" : "Fotografía requerida"}
+            Fotografía requerida / Required photo
           </p>
           <PhotoCapture
             onCapture={(d) => onPhoto({ ...d, questionId: question.id })}
@@ -298,12 +311,24 @@ export default function SurveyForm() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [photos, setPhotos] = useState<PhotoData[]>([]);
   const [surveyPoint, setSurveyPoint] = useState("");
-  const [timeSlot, setTimeSlot] = useState<string>("");
-  const [windowCode, setWindowCode] = useState<string>(""); // V1/V2/V3 para visitantes
-  const [startMinute, setStartMinute] = useState<string>("");
-  const [endMinute, setEndMinute] = useState<string>("");
-  const [surveyCode, setSurveyCode] = useState<string>("");
   const [startedAt] = useState(new Date());
+
+  // Calcular franja horaria automáticamente según la hora actual
+  const calcTimeSlot = (d: Date): string => {
+    const h = d.getHours();
+    if (h >= 10 && h < 12) return "manana";
+    if (h >= 12 && h < 15) return "mediodia";
+    if (h >= 17 && h < 20) return "tarde";
+    if (h >= 20 && h < 23) return "noche";
+    return "manana"; // fallback
+  };
+  // Calcular ventana (tramo 30 min) automáticamente
+  const calcWindowCode = (d: Date): string => {
+    const min = d.getMinutes();
+    if (min < 30) return "V1";
+    if (min < 60) return "V2";
+    return "V3";
+  };
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submittedId, setSubmittedId] = useState<number | null>(null);
@@ -350,7 +375,7 @@ export default function SurveyForm() {
       const result = await submitMutation.mutateAsync({
         templateId,
         surveyPoint: surveyPoint || undefined,
-        timeSlot: timeSlot as any || undefined,
+        timeSlot: calcTimeSlot(startedAt) as any,
         latitude: gps?.lat,
         longitude: gps?.lng,
         gpsAccuracy: gps?.accuracy,
@@ -360,12 +385,9 @@ export default function SurveyForm() {
         answers,
         status: "completa",
         deviceInfo: navigator.userAgent.substring(0, 200),
-        // Metadatos específicos de visitantes
+        // Metadatos específicos de visitantes (calculados automáticamente)
         ...(isVisitantes && {
-          windowCode: windowCode || undefined,
-          startMinute: startMinute ? parseInt(startMinute) : undefined,
-          endMinute: endMinute ? parseInt(endMinute) : undefined,
-          surveyCode: surveyCode || undefined,
+          windowCode: calcWindowCode(startedAt),
         }),
       });
 
@@ -440,20 +462,15 @@ export default function SurveyForm() {
             <X className="h-5 w-5" />
           </button>
           <div className="text-center">
-            <p className="text-sm font-semibold leading-tight">
-              {lang === "en" && templateData.nameEn ? templateData.nameEn : templateData.name}
-            </p>
-            <p className="text-xs text-primary-foreground/70">
-              {currentStep === 0 ? "Datos de campo" : `Pregunta ${currentStep} de ${totalSteps}`}
+            <p className="text-sm font-semibold leading-tight">{templateData.name}</p>
+            {templateData.nameEn && (
+              <p className="text-xs text-primary-foreground/70 italic">{templateData.nameEn}</p>
+            )}
+            <p className="text-xs text-primary-foreground/60">
+              {currentStep === 0 ? "Datos de campo / Field data" : `Pregunta ${currentStep} de ${totalSteps}`}
             </p>
           </div>
-          <button
-            onClick={() => setLang(lang === "es" ? "en" : "es")}
-            className="flex items-center gap-1 text-xs text-primary-foreground/80 hover:text-primary-foreground transition-colors"
-          >
-            <Globe className="h-4 w-4" />
-            {lang.toUpperCase()}
-          </button>
+          <div className="w-8" />
         </div>
 
         {/* Progress bar */}
@@ -504,55 +521,28 @@ export default function SurveyForm() {
               {gpsStatus === "loading" && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />}
             </div>
 
-            {/* Survey point */}
+            {/* Survey point — botones visibles */}
             <div>
               <label className="text-sm font-medium text-foreground block mb-2">
                 Punto de encuesta {isVisitantes && <span className="text-destructive">*</span>}
               </label>
-              <select
-                value={surveyPoint}
-                onChange={(e) => setSurveyPoint(e.target.value)}
-                className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Seleccionar punto...</option>
-                {/* Puntos definitivos del proyecto IATUR - Santa Cruz 2026 */}
-                <option value="01 Virgen de los Reyes">01 Virgen de los Reyes</option>
-                <option value="02 Mateos Gago">02 Mateos Gago</option>
-                <option value="03 Patio de Banderas">03 Patio de Banderas</option>
-                <option value="04 Agua / Vida">04 Agua / Vida</option>
-                <option value="05 Plaza Alfaro">05 Plaza Alfaro</option>
-                {!isVisitantes && <option value="Otro">Otro</option>}
-              </select>
-            </div>
-
-            {/* Time slot */}
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-2">
-                Bloque horario (90 min) {isVisitantes && <span className="text-destructive">*</span>}
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {(isVisitantes
-                  ? [
-                      { val: "manana", label: "Mañana (10–12)" },
-                      { val: "mediodia", label: "Mediodía (12–15)" },
-                      { val: "tarde", label: "Tarde (17–20)" },
-                      { val: "noche", label: "Noche (20–23)" },
-                    ]
-                  : [
-                      { val: "manana", label: "Mañana (8–14h)" },
-                      { val: "tarde", label: "Tarde (14–20h)" },
-                      { val: "noche", label: "Noche (20–24h)" },
-                      { val: "fin_semana", label: "Fin de semana" },
-                    ]
-                ).map(({ val, label }) => (
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { val: "01 Virgen de los Reyes", label: "01 · Virgen de los Reyes" },
+                  { val: "02 Mateos Gago", label: "02 · Mateos Gago" },
+                  { val: "03 Patio de Banderas", label: "03 · Patio de Banderas" },
+                  { val: "04 Agua / Vida", label: "04 · Agua / Vida" },
+                  { val: "05 Plaza Alfaro", label: "05 · Plaza Alfaro" },
+                  ...(!isVisitantes ? [{ val: "Otro", label: "Otro" }] : []),
+                ].map(({ val, label }) => (
                   <button
                     key={val}
                     type="button"
-                    onClick={() => setTimeSlot(val)}
-                    className={`py-3 px-4 rounded-lg border-2 text-sm font-medium transition-all ${
-                      timeSlot === val
+                    onClick={() => setSurveyPoint(val)}
+                    className={`py-3 px-4 rounded-lg border-2 text-sm font-medium text-left transition-all ${
+                      surveyPoint === val
                         ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border hover:border-primary/50"
+                        : "border-border hover:border-primary/50 bg-background"
                     }`}
                   >
                     {label}
@@ -561,76 +551,26 @@ export default function SurveyForm() {
               </div>
             </div>
 
-            {/* Campos exclusivos de visitantes */}
+
+
+            {/* Campos exclusivos de visitantes: ventana y franja se calculan automáticamente */}
             {isVisitantes && (
-              <>
-                {/* Código de ventana */}
-                <div>
-                  <label className="text-sm font-medium text-foreground block mb-2">
-                    Código de ventana (tramo 30 min) <span className="text-destructive">*</span>
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { val: "V1", label: "V1 (0–30 min)" },
-                      { val: "V2", label: "V2 (30–60 min)" },
-                      { val: "V3", label: "V3 (60–90 min)" },
-                    ].map(({ val, label }) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setWindowCode(val)}
-                        className={`py-3 px-2 rounded-lg border-2 text-sm font-medium transition-all ${
-                          windowCode === val
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border hover:border-primary/50"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+              <div className="bg-muted/50 rounded-xl p-4 text-sm space-y-1">
+                <p className="text-muted-foreground font-medium mb-2">Datos asignados automáticamente:</p>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Franja horaria</span>
+                  <span className="font-medium">{({
+                    manana: "Mañana (10–12h)",
+                    mediodia: "Mediodía (12–15h)",
+                    tarde: "Tarde (17–20h)",
+                    noche: "Noche (20–23h)",
+                  } as Record<string,string>)[calcTimeSlot(startedAt)] ?? calcTimeSlot(startedAt)}</span>
                 </div>
-
-                {/* Minutos inicio/fin */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium text-foreground block mb-2">Minuto de inicio</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={90}
-                      value={startMinute}
-                      onChange={(e) => setStartMinute(e.target.value)}
-                      placeholder="0–90"
-                      className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-foreground block mb-2">Minuto de fin</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={90}
-                      value={endMinute}
-                      onChange={(e) => setEndMinute(e.target.value)}
-                      placeholder="0–90"
-                      className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ventana (tramo 30 min)</span>
+                  <span className="font-medium">{calcWindowCode(startedAt)}</span>
                 </div>
-
-                {/* Código de cuestionario */}
-                <div>
-                  <label className="text-sm font-medium text-foreground block mb-2">Código de cuestionario</label>
-                  <input
-                    type="text"
-                    value={surveyCode}
-                    onChange={(e) => setSurveyCode(e.target.value)}
-                    placeholder="Ej: V-001"
-                    className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-              </>
+              </div>
             )}
 
             {/* Time info */}
@@ -710,20 +650,11 @@ export default function SurveyForm() {
                 <span className="text-muted-foreground">Punto</span>
                 <span className="font-medium">{surveyPoint || "—"}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Franja</span>
-                <span className="font-medium">{timeSlot || "—"}</span>
-              </div>
-              {isVisitantes && windowCode && (
+
+              {isVisitantes && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Ventana</span>
-                  <span className="font-medium">{windowCode}</span>
-                </div>
-              )}
-              {isVisitantes && surveyCode && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cód. cuestionario</span>
-                  <span className="font-medium">{surveyCode}</span>
+                  <span className="font-medium">{calcWindowCode(startedAt)}</span>
                 </div>
               )}
               <div className="flex justify-between">

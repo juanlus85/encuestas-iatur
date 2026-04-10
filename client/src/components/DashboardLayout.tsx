@@ -185,14 +185,12 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-sidebar-foreground/60" />
               </button>
               {!isCollapsed && (
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-md bg-sidebar-primary flex items-center justify-center shrink-0">
-                    <span className="text-sidebar-primary-foreground font-bold text-xs">IA</span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-sidebar-foreground truncate leading-tight">IATUR</p>
-                    <p className="text-xs text-sidebar-foreground/50 truncate">Encuestas de Campo</p>
-                  </div>
+                <div className="flex items-center min-w-0 overflow-hidden">
+                  <img
+                    src="https://d2xsxph8kpxj0f.cloudfront.net/310419663031419078/nHD7C8PRaURA7Ubm8Aop3k/logos-institucionales_324d47d4.jpg"
+                    alt="Logos institucionales"
+                    className="h-10 w-auto max-w-full object-contain"
+                  />
                 </div>
               )}
             </div>
@@ -277,10 +275,12 @@ function DashboardLayoutContent({
               <SidebarTrigger className="h-9 w-9 rounded-lg" />
               <span className="font-medium text-sm">{activeMenuItem?.label ?? "IATUR Encuestas"}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-xs">IA</span>
-              </div>
+            <div className="flex items-center">
+              <img
+                src="https://d2xsxph8kpxj0f.cloudfront.net/310419663031419078/nHD7C8PRaURA7Ubm8Aop3k/logos-institucionales_324d47d4.jpg"
+                alt="Logos"
+                className="h-8 w-auto object-contain"
+              />
             </div>
           </div>
         )}

@@ -165,3 +165,21 @@
 - [x] 7. Modo offline: almacenamiento local (IndexedDB) + sincronización al recuperar conexión
 - [x] 8. Rol revisor: acceso de solo lectura a encuestas, estadísticas, mapas, exportación y localización en tiempo real de encuestadores
 - [x] Corregir subpuntos de todos los puntos de conteo (cada punto principal debe tener todos sus subpuntos con flujos bidireccionales correctos)
+
+## Mejoras UX y branding (10 Abril 2026 - tarde)
+- [x] Puntos de encuesta como botones visibles (no desplegable) en SurveyForm
+- [x] Quitar campo de bloque horario del formulario de encuesta
+- [x] Eliminar todas las referencias a Manus (login con Manus, textos, etc.)
+- [x] Poner logo institucional en la cabecera (donde dice "AI")
+
+## Correcciones 10 abril (tarde)
+- [x] Corregir error crítico c.map is not a function en la encuesta de visitantes (parse defensivo JSON en servidor)
+- [x] Eliminar del paso 0: código cuestionario, código encuestador, fecha, franja horaria, ventana (calcular automáticamente)
+- [x] Asignar franja horaria automáticamente según la hora actual
+- [x] Asignar ventana automáticamente según la hora actual
+- [x] Numerar encuestas automáticamente (0001, 0002...)
+
+## Mejoras UX encuesta y cuotas (10 abril noche)
+- [ ] Pantalla de revisión de metadatos editable: mostrar franja, ventana, punto, idioma con valores automáticos ya rellenados pero editables antes de empezar preguntas
+- [ ] Dashboard de cuotas mejorado: mostrar claramente perfiles COMPLETOS (rojo/bloqueado, "NO buscar más") vs disponibles (verde, "Buscar este perfil")
+- [x] Mostrar preguntas en español e inglés simultáneamente (no botón de cambio, sino ambos textos visibles)

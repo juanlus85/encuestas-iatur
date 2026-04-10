@@ -893,7 +893,8 @@ export const appRouter = router({
       const vPuntos: Record<string, number> = {};
 
       for (const r of visitantesResponses) {
-        const answers = (r.answers as Array<{ questionId: number; answer: any }>) ?? [];
+        const rawAnswers = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
+        const answers = (rawAnswers as Array<{ questionId: number; answer: any }>) ?? [];
         const getAnswer = (qId: number) => answers.find((a) => a.questionId === qId)?.answer;
 
         // Género
@@ -921,7 +922,8 @@ export const appRouter = router({
       const rVinculo: Record<string, number> = { con_vinculo: 0, sin_vinculo: 0 };
 
       for (const r of residentesResponses) {
-        const answers = (r.answers as Array<{ questionId: number; answer: any }>) ?? [];
+        const rawAnswers = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
+        const answers = (rawAnswers as Array<{ questionId: number; answer: any }>) ?? [];
         const getAnswer = (qId: number) => answers.find((a) => a.questionId === qId)?.answer;
 
         // Género

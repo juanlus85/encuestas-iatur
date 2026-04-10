@@ -146,7 +146,12 @@ export async function updateSurveyTemplate(id: number, data: Partial<InsertSurve
 export async function getQuestionsByTemplate(templateId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(questions).where(eq(questions.templateId, templateId)).orderBy(questions.order);
+  const rows = await db.select().from(questions).where(eq(questions.templateId, templateId)).orderBy(questions.order);
+  // MySQL estándar puede devolver campos json como string — parsear defensivamente
+  return rows.map((q) => ({
+    ...q,
+    options: typeof q.options === "string" ? JSON.parse(q.options) : (q.options ?? null),
+  }));
 }
 
 export async function createQuestion(data: InsertQuestion) {
