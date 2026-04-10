@@ -5,11 +5,15 @@ import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
 import {
   BarChart3,
+  Calendar,
   CheckCircle2,
   ClipboardList,
+  Clock,
+  Home as HomeIcon,
   LogOut,
   MapPin,
   PersonStanding,
+  PieChart,
   TrendingUp,
   Users,
   XCircle,
@@ -23,7 +27,7 @@ import { toast } from "sonner";
 
 function EncuestadorHome() {
   const { user, logout } = useAuth();
-  const [, setLocation] = useLocation();
+  const [currentPath, setLocation] = useLocation();
   const { data: myResponses } = trpc.responses.myList.useQuery();
   const { data: templates } = trpc.templates.active.useQuery();
 
@@ -76,8 +80,15 @@ function EncuestadorHome() {
   const hour = now.getHours();
   const greeting = hour < 12 ? "Buenos días" : hour < 20 ? "Buenas tardes" : "Buenas noches";
 
+  // Bottom nav items
+  const navItems = [
+    { label: "Inicio", icon: HomeIcon, path: "/" },
+    { label: "Cuotas", icon: PieChart, path: "/cuotas" },
+    { label: "Horarios", icon: Calendar, path: "/mis-horarios" },
+    { label: "Cierre", icon: Clock, path: "/cierre-turno" },
+  ];
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       {/* Header */}
       <div className="bg-primary text-primary-foreground px-4 py-6 md:px-8">
         <div className="max-w-2xl mx-auto">
@@ -242,6 +253,32 @@ function EncuestadorHome() {
           </p>
         </div>
       </div>
+
+      {/* Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border shadow-lg">
+        <div className="flex items-stretch h-16 max-w-2xl mx-auto">
+          {navItems.map(({ label, icon: Icon, path }) => {
+            const isActive = currentPath === path;
+            return (
+              <button
+                key={path}
+                onClick={() => setLocation(path)}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className={`h-5 w-5 ${isActive ? "stroke-[2.5px]" : ""}`} />
+                <span className={`text-[10px] font-medium ${isActive ? "text-primary" : ""}`}>{label}</span>
+                {isActive && (
+                  <span className="absolute bottom-0 w-8 h-0.5 bg-primary rounded-t-full" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

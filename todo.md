@@ -199,3 +199,8 @@
 - [x] Menú encuestador: añadido Mis Horarios al sidebar (Cuotas y Cierre de Turno ya existían)
 - [x] Router: insertar en survey_responses_flat al guardar encuesta completa (mapeo order → v01-v26 / r01-r38)
 - [x] Router: earlyExit y windowCode añadidos al schema de responses.submit
+
+## Bug: Encuestadores sin menú de navegación (10 abril - noche 3)
+- [x] Añadida barra de navegación inferior (bottom nav) al Home del encuestador: Inicio, Cuotas, Horarios, Cierre
+- [x] Creado componente EncuestadorLayout con bottom nav para páginas secundarias (Cuotas, Mis Horarios, Cierre de Turno)
+- [x] Cuotas.tsx usa EncuestadorLayout cuando el usuario es encuestador, DashboardLayout para admin/revisor
