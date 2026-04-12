@@ -83,9 +83,7 @@ export const surveyResponses = mysqlTable("survey_responses", {
   encuestadorIdentifier: varchar("encuestadorIdentifier", { length: 32 }),
   deviceInfo: text("deviceInfo"), // user agent
   surveyPoint: varchar("surveyPoint", { length: 255 }), // punto de encuesta
-  timeSlot: mysqlEnum("timeSlot", ["manana", "tarde", "noche", "fin_semana"]),
-
-  // GPS
+  timeSlot: mysqlEnum("timeSlot", ["manana", "mediodia", "tarde", "noche", "fin_semana"]),
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   gpsAccuracy: decimal("gpsAccuracy", { precision: 8, scale: 2 }),
@@ -257,9 +255,7 @@ export const fieldMetrics = mysqlTable("field_metrics", {
   date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
   templateId: int("templateId"),
   surveyPoint: varchar("surveyPoint", { length: 255 }),
-  timeSlot: mysqlEnum("timeSlot", ["manana", "tarde", "noche", "fin_semana"]),
-
-  // Metrics
+  timeSlot: mysqlEnum("timeSlot", ["manana", "mediodia", "tarde", "noche", "fin_semana"]),
   completed: int("completed").default(0).notNull(),
   rejected: int("rejected").default(0).notNull(),
   substituted: int("substituted").default(0).notNull(),
@@ -287,7 +283,7 @@ export const pedestrianSessions = mysqlTable("pedestrian_sessions", {
 
   // Localización y contexto
   surveyPoint: varchar("surveyPoint", { length: 255 }).notNull(),
-  timeSlot: mysqlEnum("timeSlot", ["manana", "tarde", "noche", "fin_semana"]),
+  timeSlot: mysqlEnum("timeSlot", ["manana", "mediodia", "tarde", "noche", "fin_semana"]),
   date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
 
   // GPS de la sesión

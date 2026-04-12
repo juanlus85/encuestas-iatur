@@ -300,18 +300,35 @@ function QuestionRenderer({
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function calcTimeSlot(d: Date): string {
-  const h = d.getHours();
-  if (h >= 10 && h < 12) return "manana";
-  if (h >= 12 && h < 15) return "mediodia";
-  if (h >= 17 && h < 20) return "tarde";
-  if (h >= 20 && h < 23) return "noche";
-  return "manana";
+  // Franjas: Mañana 9:30-12:00 | Mediodía 12:00-14:30 | Tarde 16:00-18:30 | Noche 18:30-21:00
+  const totalMin = d.getHours() * 60 + d.getMinutes();
+  if (totalMin >= 9 * 60 + 30 && totalMin < 12 * 60) return "manana";
+  if (totalMin >= 12 * 60 && totalMin < 14 * 60 + 30) return "mediodia";
+  if (totalMin >= 16 * 60 && totalMin < 18 * 60 + 30) return "tarde";
+  if (totalMin >= 18 * 60 + 30 && totalMin < 21 * 60) return "noche";
+  return "";
 }
 
+// Inicio de cada franja en minutos desde medianoche
+const SLOT_START_MIN: Record<string, number> = {
+  manana: 9 * 60 + 30,
+  mediodia: 12 * 60,
+  tarde: 16 * 60,
+  noche: 18 * 60 + 30,
+};
+
 function calcWindowCode(d: Date): string {
-  const min = d.getMinutes();
-  if (min < 30) return "V1";
-  return "V2";
+  const slot = calcTimeSlot(d);
+  if (!slot) return "";
+  const totalMin = d.getHours() * 60 + d.getMinutes();
+  const elapsed = totalMin - SLOT_START_MIN[slot];
+  if (elapsed < 0) return "";
+  if (elapsed <= 30) return "V1";
+  if (elapsed <= 60) return "V2";
+  if (elapsed <= 90) return "V3";
+  if (elapsed <= 120) return "V4";
+  if (elapsed <= 150) return "V5";
+  return "";
 }
 
 function fmtTime(d: Date): string {
@@ -319,10 +336,10 @@ function fmtTime(d: Date): string {
 }
 
 const TIME_SLOT_LABELS: Record<string, string> = {
-  manana: "Mañana (10–12h)",
-  mediodia: "Mediodía (12–15h)",
-  tarde: "Tarde (17–20h)",
-  noche: "Noche (20–23h)",
+  manana: "Mañana (9:30–12:00)",
+  mediodia: "Mediodía (12:00–14:30)",
+  tarde: "Tarde (16:00–18:30)",
+  noche: "Noche (18:30–21:00)",
 };
 
 const SURVEY_POINTS = [

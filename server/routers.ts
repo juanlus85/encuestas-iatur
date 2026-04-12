@@ -279,7 +279,8 @@ export const appRouter = router({
       .input(z.object({
         templateId: z.number(),
         surveyPoint: z.string().optional(),
-        timeSlot: z.enum(["manana", "tarde", "noche", "fin_semana"]).optional(),
+        timeSlot: z.enum(["manana", "mediodia", "tarde", "noche", "fin_semana"]).optional(),
+        windowCode: z.string().optional(),
         latitude: z.number().optional(),
         longitude: z.number().optional(),
         gpsAccuracy: z.number().optional(),
@@ -290,7 +291,6 @@ export const appRouter = router({
         status: z.enum(["completa", "incompleta", "rechazada", "sustitucion"]).default("completa"),
         deviceInfo: z.string().optional(),
         earlyExit: z.boolean().optional(),
-        windowCode: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         // ── Construir columnas por pregunta (v_p01..v_p20 / r_p01..r_p36) ──────
@@ -543,7 +543,7 @@ export const appRouter = router({
         date: z.string(),
         templateId: z.number().optional(),
         surveyPoint: z.string().optional(),
-        timeSlot: z.enum(["manana", "tarde", "noche", "fin_semana"]).optional(),
+        timeSlot: z.enum(["manana", "mediodia", "tarde", "noche", "fin_semana"]).optional(),
         completed: z.number().default(0),
         rejected: z.number().default(0),
         substituted: z.number().default(0),
@@ -626,16 +626,17 @@ export const appRouter = router({
     createSession: encuestadorProcedure
       .input(z.object({
         surveyPoint: z.string().min(1),
-        timeSlot: z.enum(["manana", "tarde", "noche", "fin_semana"]).optional(),
-        date: z.string(),
+        timeSlot: z.enum(["manana", "mediodia", "tarde", "noche", "fin_semana"]).optional(),
         latitude: z.number().optional(),
         longitude: z.number().optional(),
         gpsAccuracy: z.number().optional(),
         startedAt: z.date(),
       }))
       .mutation(async ({ input, ctx }) => {
+        const sessionDate = input.startedAt.toLocaleDateString("es-ES", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).split("/").reverse().join("-");
         const result = await createPedestrianSession({
           ...input,
+          date: sessionDate,
           encuestadorId: ctx.user.id,
           encuestadorName: ctx.user.name ?? "",
           encuestadorIdentifier: ctx.user.identifier ?? "",
