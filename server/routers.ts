@@ -841,8 +841,8 @@ export const appRouter = router({
           const dt = new Date(p.recordedAt);
           return [
             p.id,
-            dt.toLocaleDateString("es-ES"),
-            dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+            (() => { const tz = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }); const parts = tz.formatToParts(dt); const p = Object.fromEntries(parts.filter(x => x.type !== "literal").map(x => [x.type, x.value])); return `${p.day}/${p.month}/${p.year}`; })(),
+            (() => { const tz = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }); const parts = tz.formatToParts(dt); const p = Object.fromEntries(parts.filter(x => x.type !== "literal").map(x => [x.type, x.value])); return `${p.hour}:${p.minute}:${p.second}`; })(),
             getSlot30(dt),
             p.surveyPoint,
             (p as any).surveyPointCode ?? "",
@@ -858,9 +858,15 @@ export const appRouter = router({
           ];
         });
         const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const fmtDate = (d: Date) => {
+          const tz = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+          const parts = tz.formatToParts(d);
+          const p = Object.fromEntries(parts.filter(x => x.type !== "literal").map(x => [x.type, x.value]));
+          return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
+        };
         const csvLines = [
-          headers.map(escape).join(";"),
-          ...rows.map((row) => row.map(escape).join(";")),
+          headers.map(escape).join(","),
+          ...rows.map((row) => row.map(escape).join(",")),
         ];
         return { csv: csvLines.join("\n"), count: rows.length };
       }),
@@ -874,6 +880,12 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const responses = await getSurveyResponses(input);
         const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const fmtDate = (d: Date) => {
+          const tz = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+          const parts = tz.formatToParts(d);
+          const p = Object.fromEntries(parts.filter(x => x.type !== "literal").map(x => [x.type, x.value]));
+          return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
+        };
         // Cabeceras metadatos
         const metaHeaders = [
           "ID", "Tipo", "Encuestador", "CodEncuestador",
@@ -905,8 +917,8 @@ export const appRouter = router({
             rAny.windowCode ?? "",
             rAny.minuteStart ?? "",
             rAny.minuteEnd ?? "",
-            r.startedAt ? new Date(r.startedAt).toLocaleString("es-ES", { timeZone: "Europe/Madrid", hour12: false }) : "",
-            r.finishedAt ? new Date(r.finishedAt).toLocaleString("es-ES", { timeZone: "Europe/Madrid", hour12: false }) : "",
+            r.startedAt ? fmtDate(new Date(r.startedAt)) : "",
+            r.finishedAt ? fmtDate(new Date(r.finishedAt)) : "",
             durMin,
             r.language,
             r.status,
@@ -925,8 +937,8 @@ export const appRouter = router({
           return [...meta, ...vCols, ...rCols];
         });
         const csvLines = [
-          headers.map(escape).join(";"),
-          ...rows.map((row) => row.map(escape).join(";")),
+          headers.map(escape).join(","),
+          ...rows.map((row) => row.map(escape).join(",")),
         ];
         return { csv: csvLines.join("\n"), count: rows.length };
       }),
@@ -951,13 +963,19 @@ export const appRouter = router({
         const rHeaders = Array.from({ length: 38 }, (_, i) => `R${String(i + 1).padStart(2, "0")}`);
         const headers = [...metaHeaders, ...vHeaders, ...rHeaders];
         const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const fmtDate = (d: Date) => {
+          const tz = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+          const parts = tz.formatToParts(d);
+          const p = Object.fromEntries(parts.filter(x => x.type !== "literal").map(x => [x.type, x.value]));
+          return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
+        };
         const csvRows = rows.map((r) => {
           const meta = [
             r.id, r.surveyType ?? "", r.surveyPoint ?? "", r.timeSlot ?? "",
             r.windowCode ?? "", r.minuteStart ?? "", r.minuteEnd ?? "",
             r.encuestadorName ?? "", r.encuestadorCode ?? "",
-            r.startedAt ? new Date(r.startedAt).toLocaleString("es-ES", { timeZone: "Europe/Madrid", hour12: false }) : "",
-            r.finishedAt ? new Date(r.finishedAt).toLocaleString("es-ES", { timeZone: "Europe/Madrid", hour12: false }) : "",
+            r.startedAt ? fmtDate(new Date(r.startedAt)) : "",
+            r.finishedAt ? fmtDate(new Date(r.finishedAt)) : "",
             r.language, r.status, r.latitude ?? "", r.longitude ?? "",
             r.gpsAccuracy ?? "", r.earlyExit ? "SI" : "NO",
           ];
@@ -965,7 +983,7 @@ export const appRouter = router({
           const rCols = Array.from({ length: 38 }, (_, i) => (r as any)[`r${String(i + 1).padStart(2, "0")}`] ?? "");
           return [...meta, ...vCols, ...rCols];
         });
-        const csvLines = [headers.map(escape).join(";"), ...csvRows.map((row) => row.map(escape).join(";"))];
+        const csvLines = [headers.map(escape).join(","), ...csvRows.map((row) => row.map(escape).join(","))];
         return { csv: csvLines.join("\n"), count: rows.length };
       }),
   }),
@@ -1025,10 +1043,17 @@ export const appRouter = router({
         const headers = ["ID", "Fecha", "Hora", "Tipo", "Punto", "Encuestador", "Identificador", "Latitud", "Longitud", "Precisión GPS (m)", "Notas"];
         const rows = rejs.map((r) => {
           const dt = new Date(r.rejectedAt);
+          const fmtDateRej = (d: Date) => {
+            const tz = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+            const parts = tz.formatToParts(d);
+            const p = Object.fromEntries(parts.filter(x => x.type !== "literal").map(x => [x.type, x.value]));
+            return { date: `${p.day}/${p.month}/${p.year}`, time: `${p.hour}:${p.minute}:${p.second}` };
+          };
+          const { date: rejDate, time: rejTime } = fmtDateRej(dt);
           return [
             r.id,
-            dt.toLocaleDateString("es-ES"),
-            dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+            rejDate,
+            rejTime,
             r.surveyType,
             r.surveyPoint ?? "",
             r.encuestadorName ?? "",
@@ -1040,7 +1065,7 @@ export const appRouter = router({
           ];
         });
         const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-        const csvLines = [headers.map(escape).join(";"), ...rows.map((row) => row.map(escape).join(";"))];
+        const csvLines = [headers.map(escape).join(","), ...rows.map((row) => row.map(escape).join(","))];
         return { csv: csvLines.join("\n"), count: rows.length };
       }),
   }),
