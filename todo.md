@@ -242,3 +242,7 @@
 - [x] Renombrar app a "Encuestas Sevilla FeelingLAND"
 - [x] Pie de firma discreto con referencia a IATUR y Organizus.es
 - [x] Regenerar SQL encuestadores con usernames y tipos correctos
+
+## Correcciones 12 abril (tarde)
+- [x] Corregir startedAt/finishedAt para que se guarden en UTC+2 (España) en lugar de UTC
+- [x] Modificar P1b en visitantes: mostrar "País" si seleccionó otro país, "Provincia/Ciudad" si seleccionó España

@@ -116,6 +116,7 @@ function QuestionRenderer({
   onAnswer,
   photos,
   onPhoto,
+  textOverride,
 }: {
   question: Question;
   lang?: "es" | "en";
@@ -123,9 +124,10 @@ function QuestionRenderer({
   onAnswer: (val: any) => void;
   photos: PhotoData[];
   onPhoto: (data: PhotoData) => void;
+  textOverride?: { es: string; en?: string };
 }) {
-  const textEs = question.text;
-  const textEn = question.textEn ?? "";
+  const textEs = textOverride?.es ?? question.text;
+  const textEn = textOverride?.en ?? question.textEn ?? "";
   const opts = question.options as QuestionOption[] | null | undefined ?? null;
 
   return (
@@ -707,7 +709,25 @@ export default function SurveyForm() {
         )}
 
         {/* ── Steps 1..n: Questions ── */}
-        {currentStep > 0 && currentQuestion && (
+        {currentStep > 0 && currentQuestion && (() => {
+          // Lógica P1b: si es visitantes y es la 2ª pregunta real (P1b),
+          // cambiar el texto según la respuesta de P1 (1ª pregunta real)
+          let p1bOverride: { es: string; en?: string } | undefined;
+          if (isVisitantes && questions.length >= 2 && currentQuestion.id === questions[1].id) {
+            const p1Answer = getAnswer(questions[0].id);
+            if (p1Answer === "espana") {
+              p1bOverride = {
+                es: "P1b. ¿Provincia/Ciudad de residencia?",
+                en: "P1b. Province/City of residence?",
+              };
+            } else {
+              p1bOverride = {
+                es: "P1b. ¿Cuál es su país de origen?",
+                en: "P1b. What is your country of origin?",
+              };
+            }
+          }
+          return (
           <div className="space-y-5">
             <QuestionRenderer
               question={currentQuestion}
@@ -716,6 +736,7 @@ export default function SurveyForm() {
               onAnswer={(val) => setAnswer(currentQuestion.id, val)}
               photos={photos.filter((p) => p.questionId === currentQuestion.id)}
               onPhoto={(d) => setPhotos((prev) => [...prev, d])}
+              textOverride={p1bOverride}
             />
             {/* Navigation buttons */}
             <div className="flex gap-3 pt-2">
@@ -759,7 +780,8 @@ export default function SurveyForm() {
               )}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ── Last step: Summary + extra photos ── */}
         {currentStep === totalSteps && totalSteps > 0 && (

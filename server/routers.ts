@@ -353,8 +353,8 @@ export const appRouter = router({
           longitude: input.longitude?.toString(),
           gpsAccuracy: input.gpsAccuracy?.toString(),
           answers: input.answers,
-          startedAt: input.startedAt ?? now,   // usar hora del servidor si no viene del cliente
-          finishedAt: input.finishedAt ?? now,
+          startedAt: now,   // siempre hora del servidor (Europe/Madrid, UTC+2)
+          finishedAt: now,  // siempre hora del servidor (Europe/Madrid, UTC+2)
         });
         const surveyId = result?.insertId as number | undefined;
         // Si la encuesta se guardó correctamente y está completa, insertar en survey_answers
@@ -366,7 +366,7 @@ export const appRouter = router({
             // Obtener el tipo de encuesta (visitantes/residentes)
             const template = await getSurveyTemplateById(input.templateId);
             const surveyType = (template?.type ?? "visitantes") as "visitantes" | "residentes";
-            const recordedAt = input.finishedAt ?? new Date();
+            const recordedAt = now; // siempre hora del servidor (Europe/Madrid, UTC+2)
             const answerRows = input.answers.map((a, idx) => {
               const q = qMap.get(a.questionId);
               const opts = (q?.options as Array<{ value: string; label: string; labelEn?: string }> | null) ?? [];
@@ -454,8 +454,8 @@ export const appRouter = router({
               encuestadorId: ctx.user.id,
               encuestadorName: ctx.user.name ?? "",
               encuestadorCode: ctx.user.identifier ?? "",
-              startedAt: input.startedAt,
-              finishedAt: input.finishedAt ?? new Date(),
+              startedAt: now,   // siempre hora del servidor (Europe/Madrid, UTC+2)
+              finishedAt: now,  // siempre hora del servidor (Europe/Madrid, UTC+2)
               latitude: input.latitude?.toString(),
               longitude: input.longitude?.toString(),
               gpsAccuracy: input.gpsAccuracy?.toString(),
