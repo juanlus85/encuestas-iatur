@@ -129,9 +129,10 @@ const CONTEO_FIELDS: FieldDef[] = [
 
 function downloadCsv(csvContent: string, filename: string, separator: "," | ";" | "\t") {
   let content = csvContent;
-  if (separator !== ",") {
+  // El servidor ya genera con ";". Si el usuario elige "," o "\t", convertimos desde ";"
+  if (separator !== ";") {
     content = content.split("\n").map(line =>
-      line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).join(separator)
+      line.split(/;(?=(?:[^"]*"[^"]*")*[^"]*$)/).join(separator)
     ).join("\n");
   }
   const blob = new Blob(["\uFEFF" + content], { type: "text/csv;charset=utf-8;" });
@@ -285,7 +286,7 @@ function ExportEncuestasSection() {
       const lines = result.data.csv.split("\n");
       if (lines.length === 0) { toast.error("CSV vacío"); return; }
 
-      const originalHeaders = lines[0].split(",").map(h => h.replace(/^"|"$/g, ""));
+      const originalHeaders = lines[0].split(";").map(h => h.replace(/^"|"$/g, ""));
       const keepIndices = originalHeaders
         .map((h, i) => {
           const key = csvHeaderMap[h] ?? h;
@@ -294,8 +295,8 @@ function ExportEncuestasSection() {
         .filter(i => i >= 0);
 
       const filteredLines = lines.map(line => {
-        const cells = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
-        return keepIndices.map(i => cells[i] ?? '""').join(",");
+        const cells = line.split(/;(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+        return keepIndices.map(i => cells[i] ?? '""').join(";");
       });
 
       const dateStr = new Date().toISOString().split("T")[0];
@@ -473,14 +474,14 @@ function ExportConteosSection() {
       const lines = result.data.csv.split("\n");
       if (lines.length === 0) { toast.error("CSV vacío"); return; }
 
-      const originalHeaders = lines[0].split(",").map(h => h.replace(/^"|"$/g, ""));
+      const originalHeaders = lines[0].split(";").map(h => h.replace(/^"|"$/g, ""));
       const keepIndices = originalHeaders
         .map((h, i) => selectedFields.has(h) ? i : -1)
         .filter(i => i >= 0);
 
       const filteredLines = lines.map(line => {
-        const cells = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
-        return keepIndices.map(i => cells[i] ?? '""').join(",");
+        const cells = line.split(/;(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+        return keepIndices.map(i => cells[i] ?? '""').join(";");
       });
 
       const dateStr = new Date().toISOString().split("T")[0];

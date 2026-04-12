@@ -859,8 +859,8 @@ export const appRouter = router({
         });
         const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
         const csvLines = [
-          headers.map(escape).join(","),
-          ...rows.map((row) => row.map(escape).join(",")),
+          headers.map(escape).join(";"),
+          ...rows.map((row) => row.map(escape).join(";")),
         ];
         return { csv: csvLines.join("\n"), count: rows.length };
       }),
@@ -925,8 +925,8 @@ export const appRouter = router({
           return [...meta, ...vCols, ...rCols];
         });
         const csvLines = [
-          headers.map(escape).join(","),
-          ...rows.map((row) => row.map(escape).join(",")),
+          headers.map(escape).join(";"),
+          ...rows.map((row) => row.map(escape).join(";")),
         ];
         return { csv: csvLines.join("\n"), count: rows.length };
       }),
@@ -965,7 +965,7 @@ export const appRouter = router({
           const rCols = Array.from({ length: 38 }, (_, i) => (r as any)[`r${String(i + 1).padStart(2, "0")}`] ?? "");
           return [...meta, ...vCols, ...rCols];
         });
-        const csvLines = [headers.map(escape).join(","), ...csvRows.map((row) => row.map(escape).join(","))];
+        const csvLines = [headers.map(escape).join(";"), ...csvRows.map((row) => row.map(escape).join(";"))];
         return { csv: csvLines.join("\n"), count: rows.length };
       }),
   }),
@@ -1040,7 +1040,7 @@ export const appRouter = router({
           ];
         });
         const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-        const csvLines = [headers.map(escape).join(","), ...rows.map((row) => row.map(escape).join(","))];
+        const csvLines = [headers.map(escape).join(";"), ...rows.map((row) => row.map(escape).join(";"))];
         return { csv: csvLines.join("\n"), count: rows.length };
       }),
   }),
