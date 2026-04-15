@@ -151,6 +151,8 @@ export const surveyResponses = mysqlTable("survey_responses", {
   r_p01: varchar("r_p01", { length: 16 }),
   // P1.1. ¿En qué calle?
   r_p02: varchar("r_p02", { length: 255 }),
+  // P1.1 (calculado). ¿Pertenece a la sección 037 (barrio turístico)?
+  seccion037: boolean("seccion037").default(false),
   // P2. ¿Cuántos años lleva viviendo en el barrio?
   r_p03: varchar("r_p03", { length: 64 }),
   // P3. ¿Percibe beneficios económicos del turismo?
@@ -648,6 +650,7 @@ export const surveyResponsesFlat = mysqlTable("survey_responses_flat", {
   // ── Respuestas RESIDENTES (R01..R38) ─────────────────────────────────────
   r01: text("r01"),   // P1. ¿Reside habitualmente en este barrio? (SI/NO → si NO: fin)
   r02: text("r02"),   // P1.1. ¿En qué calle?
+  seccion037: boolean("seccion037").default(false),  // P1.1 calculado: barrio turístico (sección 037)
   r03: text("r03"),   // P2. Años viviendo en el barrio
   r04: text("r04"),   // P3. ¿Percibe beneficios económicos del turismo?
   r05: text("r05"),   // P4. Género

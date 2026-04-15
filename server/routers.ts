@@ -78,6 +78,7 @@ import {
   clasificarEdadResidente,
   tieneVinculoTurismo,
 } from "@shared/quotas";
+import { getSeccion037 } from "@shared/calles";
 
 // ─── Middleware helpers ───────────────────────────────────────────────────────
 
@@ -341,6 +342,10 @@ export const appRouter = router({
               }
             }
           }
+          // Calcular seccion037 para residentes: r_p02 es la calle (colIdx=2)
+          if (sType === "residentes" && flatCols["r_p02"]) {
+            flatCols["seccion037"] = getSeccion037(flatCols["r_p02"] as string) ? "1" : "0";
+          }
         } catch (err) {
           console.error("[responses.submit] Error construyendo columnas planas:", err);
         }
@@ -469,6 +474,10 @@ export const appRouter = router({
               const colIdx = q.order - metaCount; // 1-based index of real question
               const colName = `${prefix2}${String(colIdx).padStart(2, "0")}`;
               flatRow[colName] = answerByOrder[q.order] ?? null;
+            }
+            // Calcular seccion037 para residentes (r02 = calle)
+            if (surveyType2 === "residentes" && flatRow["r02"]) {
+              flatRow["seccion037"] = getSeccion037(flatRow["r02"] as string);
             }
             await insertSurveyResponseFlat(flatRow as any);
           } catch (err) {
@@ -951,10 +960,10 @@ export const appRouter = router({
         ];
         // Cabeceras visitantes (v_p01..v_p20)
         const vHeaders = Array.from({ length: 20 }, (_, i) => `V_P${String(i + 1).padStart(2, "0")}`);
-        // Cabeceras residentes (r_p01..r_p34 + r_p35a/b/c + r_p36)
+        // Cabeceras residentes (r_p01..r_p34 + r_p35a/b/c + r_p36 + seccion037)
         const rHeaders = [
           ...Array.from({ length: 34 }, (_, i) => `R_P${String(i + 1).padStart(2, "0")}`),
-          "R_P35a", "R_P35b", "R_P35c", "R_P36",
+          "R_P35a", "R_P35b", "R_P35c", "R_P36", "SECCION037",
         ];
         const headers = [...metaHeaders, ...vHeaders, ...rHeaders];
         const rows = responses.map((r) => {
@@ -989,6 +998,7 @@ export const appRouter = router({
           const rCols = [
             ...Array.from({ length: 34 }, (_, i) => rAny[`r_p${String(i + 1).padStart(2, "0")}`] ?? ""),
             rAny.r_p35a ?? "", rAny.r_p35b ?? "", rAny.r_p35c ?? "", rAny.r_p36 ?? "",
+            rAny.seccion037 ? "SI" : (rAny.r_p02 ? "NO" : ""),  // SECCION037
           ];
           return [...meta, ...vCols, ...rCols];
         });
@@ -1016,7 +1026,7 @@ export const appRouter = router({
         // Cabeceras visitantes
         const vHeaders = Array.from({ length: 26 }, (_, i) => `V${String(i + 1).padStart(2, "0")}`);
         // Cabeceras residentes
-        const rHeaders = Array.from({ length: 38 }, (_, i) => `R${String(i + 1).padStart(2, "0")}`);
+        const rHeaders = [...Array.from({ length: 38 }, (_, i) => `R${String(i + 1).padStart(2, "0")}`), "SECCION037"];
         const headers = [...metaHeaders, ...vHeaders, ...rHeaders];
         const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
         const fmtDate = (d: Date) => {
@@ -1037,7 +1047,8 @@ export const appRouter = router({
           ];
           const vCols = Array.from({ length: 26 }, (_, i) => (r as any)[`v${String(i + 1).padStart(2, "0")}`] ?? "");
           const rCols = Array.from({ length: 38 }, (_, i) => (r as any)[`r${String(i + 1).padStart(2, "0")}`] ?? "");
-          return [...meta, ...vCols, ...rCols];
+          const seccion037Col = (r as any).seccion037 ? "SI" : ((r as any).r02 ? "NO" : "");
+          return [...meta, ...vCols, ...rCols, seccion037Col];
         });
         const csvLines = [headers.map(escape).join(","), ...csvRows.map((row) => row.map(escape).join(","))];
         return { csv: csvLines.join("\n"), count: rows.length };

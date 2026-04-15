@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
+import { NOMBRES_BARRIO_TURISTICO, NOMBRES_OTRAS_CALLES } from "../../../shared/calles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -236,8 +237,29 @@ function QuestionRenderer({
         />
       )}
 
-      {/* Text */}
-      {question.type === "text" && (
+      {/* Text — P1.1 calle: desplegable especial */}
+      {question.type === "text" && question.text.includes("P1.1") && (
+        <select
+          value={answer ?? ""}
+          onChange={(e) => onAnswer(e.target.value)}
+          className="w-full border border-border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+        >
+          <option value="">-- Seleccione una calle / Select a street --</option>
+          <optgroup label="Calles del barrio turístico (Sección 037)">
+            {NOMBRES_BARRIO_TURISTICO.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Otras calles del barrio">
+            {NOMBRES_OTRAS_CALLES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </optgroup>
+        </select>
+      )}
+
+      {/* Text — campo libre (resto de preguntas tipo text) */}
+      {question.type === "text" && !question.text.includes("P1.1") && (
         <textarea
           value={answer ?? ""}
           onChange={(e) => onAnswer(e.target.value)}
