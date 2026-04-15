@@ -51,6 +51,9 @@ import {
   createSurveyRejection,
   getSurveyRejections,
   getSurveyRejectionStats,
+  createCountingSession,
+  finishCountingSession,
+  getCountingSessions,
   createShift,
   getAllShifts,
   getShiftsByEncuestador,
@@ -772,6 +775,59 @@ export const appRouter = router({
         dateTo: z.string().optional(),
       }).optional())
       .query(({ input }) => getPedestrianPassStats(input ?? {})),
+  }),
+
+
+  // ─── Counting Sessions (sesiones cronometradas) ────────────────────────────
+
+  countingSessions: router({
+    start: encuestadorProcedure
+      .input(z.object({
+        surveyPointCode: z.string(),
+        surveyPointName: z.string().optional(),
+        subPointCode: z.string().optional(),
+        subPointName: z.string().optional(),
+        latitude: z.number().optional(),
+        longitude: z.number().optional(),
+        gpsAccuracy: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        return createCountingSession({
+          encuestadorId: ctx.user.id,
+          encuestadorName: ctx.user.name ?? undefined,
+          encuestadorIdentifier: ctx.user.identifier ?? undefined,
+          surveyPointCode: input.surveyPointCode,
+          surveyPointName: input.surveyPointName ?? null,
+          subPointCode: input.subPointCode ?? null,
+          subPointName: input.subPointName ?? null,
+          startedAt: new Date(),
+          totalPersons: 0,
+          latitude: input.latitude ? String(input.latitude) : null,
+          longitude: input.longitude ? String(input.longitude) : null,
+          gpsAccuracy: input.gpsAccuracy ? String(input.gpsAccuracy) : null,
+        });
+      }),
+
+    finish: encuestadorProcedure
+      .input(z.object({
+        id: z.number(),
+        totalPersons: z.number().min(0),
+      }))
+      .mutation(async ({ input }) => {
+        return finishCountingSession(input.id, {
+          finishedAt: new Date(),
+          totalPersons: input.totalPersons,
+        });
+      }),
+
+    list: adminOrRevisorProcedure
+      .input(z.object({
+        surveyPointCode: z.string().optional(),
+        encuestadorId: z.number().optional(),
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+      }).optional())
+      .query(({ input }) => getCountingSessions(input ?? {})),
   }),
 
   // ─── Pedestrian Directions ────────────────────────────────────────────────────────────────────

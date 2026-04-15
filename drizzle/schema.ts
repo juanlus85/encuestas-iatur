@@ -390,6 +390,42 @@ export const pedestrianPasses = mysqlTable("pedestrian_passes", {
 export type PedestrianPass = typeof pedestrianPasses.$inferSelect;
 export type InsertPedestrianPass = typeof pedestrianPasses.$inferInsert;
 
+// ─── Counting Sessions (sesiones de conteo cronometradas) ───────────────────
+
+/**
+ * Sesión de conteo cronometrada: registra el inicio y fin de un conteo,
+ * el total de personas contadas en ambos sentidos, el encuestador y el GPS.
+ */
+export const countingSessions = mysqlTable("counting_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  encuestadorId: int("encuestadorId").notNull(),
+  encuestadorName: varchar("encuestadorName", { length: 255 }),
+  encuestadorIdentifier: varchar("encuestadorIdentifier", { length: 32 }),
+
+  // Punto de conteo
+  surveyPointCode: varchar("surveyPointCode", { length: 16 }).notNull(), // ej: "01"
+  surveyPointName: varchar("surveyPointName", { length: 255 }),           // ej: "01 Virgen de los Reyes"
+  subPointCode: varchar("subPointCode", { length: 16 }),                  // ej: "01.01"
+  subPointName: varchar("subPointName", { length: 255 }),                 // ej: "01.01 Alemanes"
+
+  // Tiempos
+  startedAt: timestamp("startedAt").notNull(),
+  finishedAt: timestamp("finishedAt"),
+
+  // Total personas (suma de todos los pases en ambos sentidos durante la sesión)
+  totalPersons: int("totalPersons").default(0).notNull(),
+
+  // GPS al inicio del conteo
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  gpsAccuracy: decimal("gpsAccuracy", { precision: 8, scale: 2 }),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CountingSession = typeof countingSessions.$inferSelect;
+export type InsertCountingSession = typeof countingSessions.$inferInsert;
+
 // ─── Survey Rejections (rechazos rápidos) ──────────────────────────────────
 
 /**

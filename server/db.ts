@@ -813,3 +813,49 @@ export async function getSurveyResponsesFlat(filters?: {
     return true;
   });
 }
+
+// ─── Counting Sessions ────────────────────────────────────────────────────────
+import {
+  countingSessions,
+  InsertCountingSession,
+} from "../drizzle/schema";
+
+export async function createCountingSession(data: InsertCountingSession) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const [result] = await db.insert(countingSessions).values(data);
+  return result;
+}
+
+export async function finishCountingSession(id: number, data: {
+  finishedAt: Date;
+  totalPersons: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(countingSessions)
+    .set({ finishedAt: data.finishedAt, totalPersons: data.totalPersons })
+    .where(eq(countingSessions.id, id));
+}
+
+export async function getCountingSessions(filters?: {
+  encuestadorId?: number;
+  surveyPointCode?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [];
+  if (filters?.encuestadorId) conditions.push(eq(countingSessions.encuestadorId, filters.encuestadorId));
+  if (filters?.surveyPointCode) conditions.push(eq(countingSessions.surveyPointCode, filters.surveyPointCode));
+  if (filters?.dateFrom) conditions.push(gte(countingSessions.startedAt, new Date(filters.dateFrom)));
+  if (filters?.dateTo) {
+    const to = new Date(filters.dateTo);
+    to.setHours(23, 59, 59, 999);
+    conditions.push(lte(countingSessions.startedAt, to));
+  }
+  const query = db.select().from(countingSessions).orderBy(desc(countingSessions.startedAt));
+  if (conditions.length > 0) return query.where(and(...conditions));
+  return query;
+}

@@ -5,45 +5,56 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Users, ChevronLeft, Plus, CheckCircle2, ArrowRight, ArrowLeftRight } from "lucide-react";
+import { Users, ChevronLeft, Plus, CheckCircle2, ArrowRight, ArrowLeftRight, Play, Square, Timer } from "lucide-react";
 import { Link } from "wouter";
-import { SURVEY_POINTS, getFlowsForPoint, type SurveyPoint } from "../../../shared/surveyPoints";
+import { SURVEY_POINTS, getFlowsForPoint, type SurveyPoint, type SurveySubPoint } from "../../../shared/surveyPoints";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatElapsed(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function ConteoPeatonal() {
   const { user } = useAuth();
-  const [step, setStep] = useState<"punto" | "conteo">("punto");
+
+  // Pasos: punto → subpunto → conteo
+  const [step, setStep] = useState<"punto" | "subpunto" | "conteo">("punto");
   const [selectedPoint, setSelectedPoint] = useState<SurveyPoint | null>(null);
+  const [selectedSubPoint, setSelectedSubPoint] = useState<SurveySubPoint | null>(null);
+
+  // Conteo
   const [selectedCount, setSelectedCount] = useState<number | null>(null);
   const [selectedFlow, setSelectedFlow] = useState<{ label: string; from: string; to: string; fromCode: string; toCode: string } | null>(null);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupCount, setGroupCount] = useState("");
-  const [gps, setGps] = useState<{ lat: number; lng: number; acc: number } | null>(null);
-  const [recentPasses, setRecentPasses] = useState<{ count: number; direction: string; time: string }[]>([]);
-  const [totalToday, setTotalToday] = useState(0);
   const groupInputRef = useRef<HTMLInputElement>(null);
 
+  // GPS
+  const [gps, setGps] = useState<{ lat: number; lng: number; acc: number } | null>(null);
+
+  // Registros recientes y total
+  const [recentPasses, setRecentPasses] = useState<{ count: number; direction: string; time: string }[]>([]);
+  const [totalToday, setTotalToday] = useState(0);
+
+  // Sesión cronometrada
+  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessionStartedAt, setSessionStartedAt] = useState<Date | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [sessionTotal, setSessionTotal] = useState(0); // total de personas en esta sesión
+
+  // Scroll al inicio al cambiar de paso
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [step]);
 
-  const addPass = trpc.passes.add.useMutation({
-    onSuccess: () => {
-      if (selectedCount !== null && selectedFlow) {
-        const newPass = {
-          count: selectedCount,
-          direction: selectedFlow?.label ?? "",
-          time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-        };
-        setRecentPasses((prev) => [newPass, ...prev.slice(0, 9)]);
-        setTotalToday((prev) => prev + (selectedCount ?? 0));
-        toast.success(`+${selectedCount} persona${selectedCount !== 1 ? "s" : ""} · ${selectedFlow?.label}`, { duration: 1500 });
-        setSelectedCount(null);
-        setSelectedFlow(null as any);
-      }
-    },
-    onError: (err) => toast.error("Error al guardar: " + err.message),
-  });
-
+  // GPS watch cuando estamos en el paso de conteo
   useEffect(() => {
     if (step !== "conteo" || !navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
@@ -54,17 +65,73 @@ export default function ConteoPeatonal() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [step]);
 
+  // Temporizador
+  useEffect(() => {
+    if (!sessionStartedAt) return;
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - sessionStartedAt.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [sessionStartedAt]);
+
+  // ─── Mutations ──────────────────────────────────────────────────────────────
+
+  const startSession = trpc.countingSessions.start.useMutation({
+    onSuccess: (data: any) => {
+      const id = data?.insertId ?? data?.id ?? null;
+      if (id) {
+        setSessionId(Number(id));
+        setSessionStartedAt(new Date());
+        setSessionTotal(0);
+        setElapsed(0);
+        toast.success("Conteo iniciado");
+      }
+    },
+    onError: (err) => toast.error("Error al iniciar conteo: " + err.message),
+  });
+
+  const finishSession = trpc.countingSessions.finish.useMutation({
+    onSuccess: () => {
+      toast.success(`Conteo finalizado · ${sessionTotal} personas en total`);
+      setSessionId(null);
+      setSessionStartedAt(null);
+      setElapsed(0);
+    },
+    onError: (err) => toast.error("Error al finalizar conteo: " + err.message),
+  });
+
+  const addPass = trpc.passes.add.useMutation({
+    onSuccess: () => {
+      if (selectedCount !== null && selectedFlow) {
+        const newPass = {
+          count: selectedCount,
+          direction: selectedFlow.label,
+          time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+        };
+        setRecentPasses((prev) => [newPass, ...prev.slice(0, 9)]);
+        setTotalToday((prev) => prev + selectedCount);
+        setSessionTotal((prev) => prev + selectedCount);
+        toast.success(`+${selectedCount} persona${selectedCount !== 1 ? "s" : ""} · ${selectedFlow.label}`, { duration: 1500 });
+        setSelectedCount(null);
+        setSelectedFlow(null);
+      }
+    },
+    onError: (err) => toast.error("Error al guardar: " + err.message),
+  });
+
+  // ─── Handlers ───────────────────────────────────────────────────────────────
+
   const handleAddPass = () => {
     if (!selectedCount || !selectedFlow || !selectedPoint) {
       toast.error("Selecciona el número de personas y el flujo");
       return;
     }
     addPass.mutate({
-      surveyPoint: selectedPoint.fullName,        // nombre completo para mostrar en panel admin
-      surveyPointCode: selectedPoint.code,         // solo código para BD (ej: "01")
+      surveyPoint: selectedPoint.fullName,
+      surveyPointCode: selectedPoint.code,
       directionLabel: selectedFlow.label,
-      flowOrigin: selectedFlow.fromCode,           // solo código origen (ej: "01")
-      flowDestination: selectedFlow.toCode,        // solo código destino (ej: "01.01")
+      flowOrigin: selectedFlow.fromCode,
+      flowDestination: selectedFlow.toCode,
       count: selectedCount,
       latitude: gps?.lat,
       longitude: gps?.lng,
@@ -81,6 +148,48 @@ export default function ConteoPeatonal() {
       setGroupCount("");
     }
   };
+
+  const handleStartSession = () => {
+    if (!selectedPoint) return;
+    startSession.mutate({
+      surveyPointCode: selectedPoint.code,
+      surveyPointName: selectedPoint.fullName,
+      subPointCode: selectedSubPoint?.code ?? undefined,
+      subPointName: selectedSubPoint?.fullName ?? undefined,
+      latitude: gps?.lat,
+      longitude: gps?.lng,
+      gpsAccuracy: gps?.acc,
+    });
+  };
+
+  const handleFinishSession = () => {
+    if (!sessionId) return;
+    finishSession.mutate({ id: sessionId, totalPersons: sessionTotal });
+  };
+
+  const handleBackToSubpunto = () => {
+    setStep("subpunto");
+    setSelectedSubPoint(null);
+    setSelectedCount(null);
+    setSelectedFlow(null);
+    // Si hay sesión activa, la finalizamos
+    if (sessionId) {
+      finishSession.mutate({ id: sessionId, totalPersons: sessionTotal });
+    }
+  };
+
+  const handleBackToPunto = () => {
+    setStep("punto");
+    setSelectedPoint(null);
+    setSelectedSubPoint(null);
+    setSelectedCount(null);
+    setSelectedFlow(null);
+    if (sessionId) {
+      finishSession.mutate({ id: sessionId, totalPersons: sessionTotal });
+    }
+  };
+
+  // ─── PASO 1: Selección de punto principal ────────────────────────────────────
 
   if (step === "punto") {
     return (
@@ -99,13 +208,13 @@ export default function ConteoPeatonal() {
         <div className="flex-1 p-4 max-w-lg mx-auto w-full">
           <div className="mb-6 mt-4">
             <h2 className="text-xl font-bold text-gray-800 mb-1">Selecciona el punto de conteo</h2>
-            <p className="text-sm text-gray-500">Elige el punto donde vas a realizar el conteo peatonal</p>
+            <p className="text-sm text-gray-500">Elige el punto principal donde vas a realizar el conteo</p>
           </div>
           <div className="space-y-3">
             {SURVEY_POINTS.map((point) => (
               <button
                 key={point.code}
-                onClick={() => { setSelectedPoint(point); setStep("conteo"); }}
+                onClick={() => { setSelectedPoint(point); setStep("subpunto"); }}
                 className="w-full text-left bg-white border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 rounded-xl p-5 transition-all duration-150 flex items-center gap-4 group"
               >
                 <div className="w-12 h-12 rounded-full bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center shrink-0 transition-colors">
@@ -126,23 +235,76 @@ export default function ConteoPeatonal() {
     );
   }
 
-  const flows = selectedPoint ? getFlowsForPoint(selectedPoint) : [];
+  // ─── PASO 2: Selección de subpunto ───────────────────────────────────────────
+
+  if (step === "subpunto" && selectedPoint) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="shrink-0" onClick={handleBackToPunto}>
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">
+              {selectedPoint.code} {selectedPoint.name}
+            </h1>
+            <p className="text-sm text-gray-500">Selecciona el subpunto</p>
+          </div>
+        </div>
+        <div className="flex-1 p-4 max-w-lg mx-auto w-full">
+          <div className="mb-6 mt-4">
+            <h2 className="text-xl font-bold text-gray-800 mb-1">¿Desde qué subpunto?</h2>
+            <p className="text-sm text-gray-500">
+              Elige el subpunto. El conteo mostrará solo los flujos hacia ese subpunto en ambos sentidos.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {selectedPoint.subPoints.map((sub) => (
+              <button
+                key={sub.code}
+                onClick={() => { setSelectedSubPoint(sub); setStep("conteo"); }}
+                className="w-full text-left bg-white border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 rounded-xl p-5 transition-all duration-150 flex items-center gap-4 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-indigo-100 group-hover:bg-indigo-200 flex items-center justify-center shrink-0 transition-colors">
+                  <span className="text-indigo-700 font-bold text-sm">{sub.code}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-gray-900 text-base">{sub.name}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {selectedPoint.fullName} ↔ {sub.fullName}
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 ml-auto transition-colors shrink-0" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PASO 3: Pantalla de conteo ──────────────────────────────────────────────
+
+  // Flujos filtrados: solo los que involucran el subpunto seleccionado
+  const allFlows = selectedPoint ? getFlowsForPoint(selectedPoint) : [];
+  const flows = selectedSubPoint
+    ? allFlows.filter((f) => f.fromCode === selectedSubPoint.code || f.toCode === selectedSubPoint.code)
+    : allFlows;
+
   const canAdd = selectedCount !== null && selectedFlow !== null;
+  const sessionActive = sessionId !== null && sessionStartedAt !== null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0"
-          onClick={() => { setStep("punto"); setSelectedCount(null); setSelectedFlow(null); }}
-        >
+        <Button variant="ghost" size="icon" className="shrink-0" onClick={handleBackToSubpunto}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-gray-900 truncate">
             {selectedPoint?.code} {selectedPoint?.name}
+            {selectedSubPoint && <span className="text-gray-500 font-normal"> · {selectedSubPoint.name}</span>}
           </h1>
           <p className="text-xs text-gray-500">
             {gps ? `GPS ±${Math.round(gps.acc)}m` : "Obteniendo GPS..."}
@@ -155,6 +317,49 @@ export default function ConteoPeatonal() {
       </div>
 
       <div className="flex-1 p-4 max-w-lg mx-auto w-full space-y-5">
+
+        {/* ─── Barra de sesión cronometrada ─── */}
+        <div className="bg-white border border-gray-200 rounded-xl p-3">
+          <div className="grid grid-cols-3 gap-2 items-center">
+            {/* Botón Iniciar */}
+            <Button
+              onClick={handleStartSession}
+              disabled={sessionActive || startSession.isPending}
+              className="h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-40"
+            >
+              <Play className="h-4 w-4 mr-1.5" />
+              Iniciar
+            </Button>
+
+            {/* Temporizador central */}
+            <div className="flex flex-col items-center justify-center">
+              <div className={`flex items-center gap-1.5 ${sessionActive ? "text-blue-700" : "text-gray-400"}`}>
+                <Timer className="h-4 w-4" />
+                <span className="text-xl font-mono font-bold tabular-nums">
+                  {formatElapsed(elapsed)}
+                </span>
+              </div>
+              {sessionActive && (
+                <span className="text-xs text-green-600 font-medium mt-0.5">{sessionTotal} personas</span>
+              )}
+              {!sessionActive && (
+                <span className="text-xs text-gray-400 mt-0.5">sin sesión</span>
+              )}
+            </div>
+
+            {/* Botón Finalizar */}
+            <Button
+              onClick={handleFinishSession}
+              disabled={!sessionActive || finishSession.isPending}
+              className="h-12 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-40"
+            >
+              <Square className="h-4 w-4 mr-1.5" />
+              Finalizar
+            </Button>
+          </div>
+        </div>
+
+        {/* ─── Personas ─── */}
         <div>
           <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
             <Users className="h-4 w-4" /> Personas
@@ -190,6 +395,7 @@ export default function ConteoPeatonal() {
           </button>
         </div>
 
+        {/* ─── Flujos (solo los del subpunto seleccionado) ─── */}
         <div>
           <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
             <ArrowLeftRight className="h-4 w-4" /> Flujo (sentido)
@@ -211,6 +417,7 @@ export default function ConteoPeatonal() {
           </div>
         </div>
 
+        {/* ─── Botón Añadir ─── */}
         <Button
           onClick={handleAddPass}
           disabled={!canAdd || addPass.isPending}
@@ -225,6 +432,7 @@ export default function ConteoPeatonal() {
           ) : "Selecciona personas y flujo"}
         </Button>
 
+        {/* ─── Últimos registros ─── */}
         {recentPasses.length > 0 && (
           <div>
             <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Últimos registros</h2>
@@ -243,6 +451,7 @@ export default function ConteoPeatonal() {
         )}
       </div>
 
+      {/* Dialog grupo grande */}
       <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Grupo grande</DialogTitle></DialogHeader>
