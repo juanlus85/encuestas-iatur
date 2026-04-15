@@ -344,7 +344,10 @@ function calcTimeSlot(d: Date): string {
   if (totalMin >= 12 * 60 && totalMin < 14 * 60 + 30) return "mediodia";
   if (totalMin >= 16 * 60 && totalMin < 18 * 60 + 30) return "tarde";
   if (totalMin >= 18 * 60 + 30 && totalMin < 21 * 60) return "noche";
-  return "";
+  // Fuera de franja: asignar el turno más cercano
+  if (totalMin < 9 * 60 + 30) return "manana";   // antes de mañana → mañana
+  if (totalMin < 16 * 60) return "mediodia";       // entre mediodía y tarde → mediodía
+  return "noche";                                   // después de noche → noche
 }
 
 // Inicio de cada franja en minutos desde medianoche
