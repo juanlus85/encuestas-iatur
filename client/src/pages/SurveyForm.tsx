@@ -118,6 +118,7 @@ function QuestionRenderer({
   photos,
   onPhoto,
   textOverride,
+  onNotResident,
 }: {
   question: Question;
   lang?: "es" | "en";
@@ -126,6 +127,7 @@ function QuestionRenderer({
   photos: PhotoData[];
   onPhoto: (data: PhotoData) => void;
   textOverride?: { es: string; en?: string };
+  onNotResident?: (questionId: number) => void;
 }) {
   const textEs = textOverride?.es ?? question.text;
   const textEn = textOverride?.en ?? question.textEn ?? "";
@@ -239,23 +241,37 @@ function QuestionRenderer({
 
       {/* Text — P1.1 calle: desplegable especial */}
       {question.type === "text" && question.text.includes("P1.1") && (
-        <select
-          value={answer ?? ""}
-          onChange={(e) => onAnswer(e.target.value)}
-          className="w-full border border-border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-        >
-          <option value="">-- Seleccione una calle / Select a street --</option>
-          <optgroup label="Calles del barrio turístico (Sección 037)">
-            {NOMBRES_BARRIO_TURISTICO.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </optgroup>
-          <optgroup label="Otras calles del barrio">
-            {NOMBRES_OTRAS_CALLES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </optgroup>
-        </select>
+        <div className="space-y-3">
+          <select
+            value={answer ?? ""}
+            onChange={(e) => onAnswer(e.target.value)}
+            className="w-full border border-border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+          >
+            <option value="">-- Seleccione una calle / Select a street --</option>
+            <optgroup label="Calles del barrio turístico (Sección 037)">
+              {NOMBRES_BARRIO_TURISTICO.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Otras calles del barrio">
+              {NOMBRES_OTRAS_CALLES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </optgroup>
+          </select>
+          {onNotResident && (
+            <button
+              type="button"
+              onClick={() => {
+                onNotResident(question.id);
+              }}
+              className="w-full py-3 px-4 rounded-xl border-2 border-destructive/60 text-destructive font-medium text-sm hover:bg-destructive/10 transition-colors"
+            >
+              No es Residente de la zona objeto de estudio
+              <span className="block text-xs font-normal opacity-75 mt-0.5">Not a resident of the study area → End survey</span>
+            </button>
+          )}
+        </div>
       )}
 
       {/* Text — campo libre (resto de preguntas tipo text) */}
@@ -485,8 +501,9 @@ export default function SurveyForm() {
     setCurrentStep((s) => s + 1);
   };
 
-  const handleEarlyExit = async () => {
+  const handleEarlyExit = async (extraAnswers?: Answer[]) => {
     setSubmitting(true);
+    const finalAnswers = extraAnswers ? [...answers, ...extraAnswers.filter(ea => !answers.find(a => a.questionId === ea.questionId))] : answers;
     try {
       const result = await submitMutation.mutateAsync({
         templateId,
@@ -498,7 +515,7 @@ export default function SurveyForm() {
         startedAt,
         finishedAt: new Date(),
         language: lang,
-        answers,
+        answers: finalAnswers,
         status: "incompleta",
         deviceInfo: navigator.userAgent.substring(0, 200),
         earlyExit: true,
@@ -774,6 +791,7 @@ export default function SurveyForm() {
               photos={photos.filter((p) => p.questionId === currentQuestion.id)}
               onPhoto={(d) => setPhotos((prev) => [...prev, d])}
               textOverride={p1bOverride}
+              onNotResident={isResidentes && currentQuestion.text.includes("P1.1") ? (qId: number) => handleEarlyExit([{ questionId: qId, answer: "No es residente de la zona objeto de estudio" }]) : undefined}
             />
             {/* Navigation buttons */}
             <div className="flex gap-3 pt-2">
