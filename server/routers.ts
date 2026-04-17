@@ -387,18 +387,35 @@ export const appRouter = router({
           console.error("[responses.submit] Error construyendo columnas planas:", err);
         }
 
-        const result = await createSurveyResponse({
-          ...input,
-          ...flatCols,
-          encuestadorId: ctx.user.id,
-          encuestadorName: ctx.user.name ?? "",
-          encuestadorIdentifier: ctx.user.identifier ?? "",
-          latitude: input.latitude?.toString(),
-          longitude: input.longitude?.toString(),
-          gpsAccuracy: input.gpsAccuracy?.toString(),
-          answers: input.answers,
-          // startedAt y finishedAt usan DEFAULT NOW() de TiDB (igual que createdAt)
-        });
+        // Log flatCols para diagnóstico
+        console.log("[responses.submit] flatCols keys:", Object.keys(flatCols).sort().join(", "));
+        console.log("[responses.submit] flatCols values sample:", JSON.stringify(Object.fromEntries(Object.entries(flatCols).slice(0, 10))));
+        
+        let result;
+        try {
+          result = await createSurveyResponse({
+            ...input,
+            ...flatCols,
+            encuestadorId: ctx.user.id,
+            encuestadorName: ctx.user.name ?? "",
+            encuestadorIdentifier: ctx.user.identifier ?? "",
+            latitude: input.latitude?.toString(),
+            longitude: input.longitude?.toString(),
+            gpsAccuracy: input.gpsAccuracy?.toString(),
+            answers: input.answers,
+            // startedAt y finishedAt usan DEFAULT NOW() de TiDB (igual que createdAt)
+          });
+        } catch (dbErr: any) {
+          console.error("[responses.submit] DB INSERT error:", {
+            message: dbErr?.message,
+            code: dbErr?.code,
+            errno: dbErr?.errno,
+            sqlState: dbErr?.sqlState,
+            sqlMessage: dbErr?.sqlMessage,
+            sql: dbErr?.sql?.substring(0, 500),
+          });
+          throw dbErr;
+        }
         const surveyId = result?.insertId as number | undefined;
         // Si la encuesta se guardó correctamente y está completa, insertar en survey_answers
         if (surveyId && input.status === "completa") {
