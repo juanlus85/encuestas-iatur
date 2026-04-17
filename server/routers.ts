@@ -1003,10 +1003,10 @@ export const appRouter = router({
         ];
         // Cabeceras visitantes (v_p01..v_p20)
         const vHeaders = Array.from({ length: 20 }, (_, i) => `V_P${String(i + 1).padStart(2, "0")}`);
-        // Cabeceras residentes (r_p01..r_p34 + r_p35a/b/c + r_p36 + seccion037)
+        // Cabeceras residentes v6 (r_p01..r_p34 + r_p35 + r_p35a/b/c + r_p36 + r_p37 + seccion037)
         const rHeaders = [
           ...Array.from({ length: 34 }, (_, i) => `R_P${String(i + 1).padStart(2, "0")}`),
-          "R_P35a", "R_P35b", "R_P35c", "R_P36", "SECCION037",
+          "R_P35", "R_P35a", "R_P35b", "R_P35c", "R_P36", "R_P37", "SECCION037",
         ];
         const headers = [...metaHeaders, ...vHeaders, ...rHeaders];
         const rows = responses.map((r) => {
@@ -1037,10 +1037,10 @@ export const appRouter = router({
           ];
           // Columnas visitantes
           const vCols = Array.from({ length: 20 }, (_, i) => rAny[`v_p${String(i + 1).padStart(2, "0")}`] ?? "");
-          // Columnas residentes
+          // Columnas residentes v6
           const rCols = [
             ...Array.from({ length: 34 }, (_, i) => rAny[`r_p${String(i + 1).padStart(2, "0")}`] ?? ""),
-            rAny.r_p35a ?? "", rAny.r_p35b ?? "", rAny.r_p35c ?? "", rAny.r_p36 ?? "",
+            rAny.r_p35 ?? "", rAny.r_p35a ?? "", rAny.r_p35b ?? "", rAny.r_p35c ?? "", rAny.r_p36 ?? "", rAny.r_p37 ?? "",
             rAny.seccion037 === 1 || rAny.seccion037 === true ? "1" : (rAny.seccion037 === 2 ? "2" : ""),  // SECCION037: 1=Centro histórico, 2=Resto de Sevilla
           ];
           return [...meta, ...vCols, ...rCols];

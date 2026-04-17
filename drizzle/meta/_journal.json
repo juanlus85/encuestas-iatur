@@ -120,6 +120,13 @@
       "when": 1776439672271,
       "tag": "0016_violet_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1776444266130,
+      "tag": "0017_giant_ender_wiggin",
+      "breakpoints": true
     }
   ]
 }

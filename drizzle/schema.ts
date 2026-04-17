@@ -217,12 +217,15 @@ export const surveyResponses = mysqlTable("survey_responses", {
   r_p33: varchar("r_p33", { length: 8 }),
   // P12. ¿Cómo afecta el turismo a su comunidad? (1-5)
   r_p34: varchar("r_p34", { length: 8 }),
-  // P13. Medidas prioritarias (múltiple, hasta 3) → hasta 3 valores separados
+  // P12b. ¿Cómo considera que afecta el turismo a su comunidad? (escala 1-5) — v6 colIdx 35
+  r_p35: varchar("r_p35", { length: 8 }),
+  // P13. Medidas prioritarias (múltiple, hasta 3) → hasta 3 valores separados — v6 colIdx 36
   r_p35a: varchar("r_p35a", { length: 64 }),
   r_p35b: varchar("r_p35b", { length: 64 }),
   r_p35c: varchar("r_p35c", { length: 64 }),
-  // P14. Observaciones finales
+  // P14. Observaciones finales — v6 colIdx 37
   r_p36: text("r_p36"),
+  r_p37: text("r_p37"),
 
   // Status
   status: mysqlEnum("status", ["completa", "incompleta", "rechazada", "sustitucion"]).default("completa").notNull(),
