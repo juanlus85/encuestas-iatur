@@ -259,16 +259,7 @@ function QuestionRenderer({
             ))}
             <option value="__otra__">Otra calle / Other street</option>
           </select>
-          {onEarlyExit && (
-            <button
-              type="button"
-              onClick={onEarlyExit}
-              className="w-full py-3 px-4 rounded-xl border-2 border-destructive text-destructive font-semibold text-sm hover:bg-destructive hover:text-destructive-foreground transition-all"
-            >
-              ❌ No es Residente de la zona objeto de estudio
-              <span className="block text-xs font-normal opacity-80 mt-0.5">Not a resident of the study area</span>
-            </button>
-          )}
+
         </div>
       )}
 
