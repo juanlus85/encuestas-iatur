@@ -15,7 +15,7 @@ function MapLegend({ mode }: { mode: ViewMode }) {
     return (
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-blue-400" />
+          <div className="w-3 h-3 rounded-full bg-green-500" />
           <span>Baja densidad</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -288,13 +288,18 @@ export default function Mapa() {
         data: heatmapData,
         map,
         radius: 25,
-        opacity: 0.7,
+        opacity: 0.75,
         gradient: [
-          "rgba(0, 255, 255, 0)", "rgba(0, 255, 255, 1)", "rgba(0, 191, 255, 1)",
-          "rgba(0, 127, 255, 1)", "rgba(0, 63, 255, 1)", "rgba(0, 0, 255, 1)",
-          "rgba(0, 0, 223, 1)", "rgba(0, 0, 191, 1)", "rgba(0, 0, 159, 1)",
-          "rgba(0, 0, 127, 1)", "rgba(63, 0, 91, 1)", "rgba(127, 0, 63, 1)",
-          "rgba(191, 0, 31, 1)", "rgba(255, 0, 0, 1)",
+          "rgba(0, 255, 0, 0)",
+          "rgba(0, 255, 0, 1)",
+          "rgba(64, 220, 0, 1)",
+          "rgba(128, 200, 0, 1)",
+          "rgba(180, 180, 0, 1)",
+          "rgba(220, 160, 0, 1)",
+          "rgba(255, 140, 0, 1)",
+          "rgba(255, 100, 0, 1)",
+          "rgba(255, 60, 0, 1)",
+          "rgba(255, 0, 0, 1)",
         ],
       });
     }
