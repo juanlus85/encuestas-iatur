@@ -690,6 +690,352 @@ export const appRouter = router({
       .query(({ input }) => getGpsLocations(input)),
     latestLocations: adminOrRevisorProcedure
       .query(() => getLatestEncuestadorLocations()),
+
+    // ── Estadísticas detalladas de visitantes ──────────────────────────────
+    visitantesStats: adminOrRevisorProcedure
+      .input(z.object({ dateFrom: z.date().optional(), dateTo: z.date().optional() }).optional())
+      .query(async ({ input }) => {
+        const responses = await getSurveyResponses({
+          ...(input?.dateFrom ? { dateFrom: input.dateFrom } : {}),
+          ...(input?.dateTo ? { dateTo: input.dateTo } : {}),
+        });
+        const vis = responses.filter((r) => r.templateType === "visitantes");
+
+        const count = (arr: string[]) => {
+          const m: Record<string, number> = {};
+          for (const v of arr) { m[v] = (m[v] ?? 0) + 1; }
+          return Object.entries(m).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+        };
+        const getA = (answers: any[], qId: number) => answers.find((a: any) => a.questionId === qId)?.answer;
+
+        const pais: string[] = [];
+        const frecuencia: string[] = [];
+        const estancia: string[] = [];
+        const edad: string[] = [];
+        const genero: string[] = [];
+        const motivo: string[] = [];
+        const grupo: string[] = [];
+        const transporte: string[] = [];
+        const actividad: string[] = [];
+        const masificacion: string[] = [];
+        const valoracion: number[] = [];
+        const satisfaccion: number[] = [];
+        const byPunto: Record<string, number> = {};
+
+        for (const r of vis) {
+          const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
+          const ans = (raw as any[]) ?? [];
+          // Procedencia
+          const p = getA(ans, 60007) ?? "";
+          const pp = getA(ans, 60008) ?? "";
+          const proc = clasificarProcedencia(p, pp);
+          pais.push(proc === "sevilla" ? "Sevilla" : proc === "nacional" ? "Nacional" : "Extranjero");
+          // Frecuencia visita
+          const frec = getA(ans, 60009);
+          if (frec) frecuencia.push(frec);
+          // Estancia
+          const est = getA(ans, 60010);
+          if (est) estancia.push(est);
+          // Edad
+          const e = getA(ans, 60011);
+          if (e) edad.push(e);
+          // Género
+          const g = getA(ans, 60012);
+          if (g) genero.push(g);
+          // Motivo
+          const m = getA(ans, 60013);
+          if (m) motivo.push(m);
+          // Grupo
+          const gr = getA(ans, 60014);
+          if (gr) grupo.push(gr);
+          // Transporte
+          const tr = getA(ans, 60016);
+          if (tr) transporte.push(tr);
+          // Actividad
+          const ac = getA(ans, 60017);
+          if (ac) actividad.push(ac);
+          // Masificación
+          const mas = getA(ans, 60018);
+          if (mas) masificacion.push(mas);
+          // Valoración espacio (P11)
+          const val = Number(getA(ans, 60019));
+          if (!isNaN(val) && val > 0) valoracion.push(val);
+          // Satisfacción general (P13)
+          const sat = Number(getA(ans, 60021));
+          if (!isNaN(sat) && sat > 0) satisfaccion.push(sat);
+          // Punto
+          const pt = r.surveyPoint ?? "Sin punto";
+          byPunto[pt] = (byPunto[pt] ?? 0) + 1;
+        }
+
+        const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : 0;
+
+        const FREC_LABELS: Record<string, string> = {
+          primera_vez: "1ª vez", "2_3_veces": "2-3 veces", "4_10_veces": "4-10 veces", mas_10: ">10 veces",
+        };
+        const ESTANCIA_LABELS: Record<string, string> = {
+          "1_noche": "1 noche", "2_3_noches": "2-3 noches", "4_7_noches": "4-7 noches", mas_semana: ">1 semana", sin_pernocta: "Sin pernocta",
+        };
+        const EDAD_LABELS: Record<string, string> = {
+          "18_29": "18-29", "30_44": "30-44", "45_64": "45-64", "65_75": "65-75", "76_mas": ">75",
+        };
+        const MOTIVO_LABELS: Record<string, string> = {
+          turismo_cultural: "Cultural", ocio: "Ocio", familia_amigos: "Familia/amigos",
+          eventos: "Eventos", trabajo: "Trabajo", otro: "Otro",
+        };
+        const GRUPO_LABELS: Record<string, string> = {
+          solo: "Solo", pareja: "Pareja", familia: "Familia", amigos: "Amigos",
+          grupo_organizado: "Grupo org.", otro: "Otro",
+        };
+        const TRANSPORTE_LABELS: Record<string, string> = {
+          caminando: "A pie", autobus_tranvia: "Bus/Tranvía", taxi_vtc: "Taxi/VTC",
+          vehiculo_propio: "Vehículo propio", bicicleta: "Bicicleta", otro: "Otro",
+        };
+        const ACTIVIDAD_LABELS: Record<string, string> = {
+          paseando: "Paseando", visita_monumento: "Visita monumento", camino_otro_lugar: "De paso",
+          recorrido_planificado: "Recorrido plan.", recomendacion: "Recomendación", otro: "Otro",
+        };
+        const MAS_LABELS: Record<string, string> = {
+          no: "No afecta", acorte_visita: "Acorté visita", cambie_horario: "Cambié horario",
+          evite_lugar: "Evité el lugar", otro: "Otro",
+        };
+
+        const relabel = (arr: string[], labels: Record<string, string>) =>
+          count(arr).map((d) => ({ ...d, name: labels[d.name] ?? d.name }));
+
+        return {
+          total: vis.length,
+          pais: relabel(pais, { Sevilla: "Sevilla", Nacional: "Nacional", Extranjero: "Extranjero" }),
+          frecuencia: relabel(frecuencia, FREC_LABELS),
+          estancia: relabel(estancia, ESTANCIA_LABELS),
+          edad: relabel(edad, EDAD_LABELS),
+          genero: relabel(genero, { hombre: "Hombre", mujer: "Mujer", otro: "Otro" }),
+          motivo: relabel(motivo, MOTIVO_LABELS),
+          grupo: relabel(grupo, GRUPO_LABELS),
+          transporte: relabel(transporte, TRANSPORTE_LABELS),
+          actividad: relabel(actividad, ACTIVIDAD_LABELS),
+          masificacion: relabel(masificacion, MAS_LABELS),
+          avgValoracion: avg(valoracion),
+          avgSatisfaccion: avg(satisfaccion),
+          valoracionDist: count(valoracion.map(String)).map((d) => ({ name: `${d.name}★`, value: d.value })).sort((a, b) => a.name.localeCompare(b.name)),
+          satisfaccionDist: count(satisfaccion.map(String)).map((d) => ({ name: `${d.name}★`, value: d.value })).sort((a, b) => a.name.localeCompare(b.name)),
+          byPunto: Object.entries(byPunto).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
+        };
+      }),
+
+    // ── Estadísticas detalladas de residentes ──────────────────────────────
+    residentesStats: adminOrRevisorProcedure
+      .input(z.object({ dateFrom: z.date().optional(), dateTo: z.date().optional() }).optional())
+      .query(async ({ input }) => {
+        const responses = await getSurveyResponses({
+          ...(input?.dateFrom ? { dateFrom: input.dateFrom } : {}),
+          ...(input?.dateTo ? { dateTo: input.dateTo } : {}),
+        });
+        const res = responses.filter((r) => r.templateType === "residentes");
+
+        const count = (arr: string[]) => {
+          const m: Record<string, number> = {};
+          for (const v of arr) { m[v] = (m[v] ?? 0) + 1; }
+          return Object.entries(m).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+        };
+        const getA = (answers: any[], qId: number) => answers.find((a: any) => a.questionId === qId)?.answer;
+        const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : 0;
+
+        const genero: string[] = [];
+        const edad: string[] = [];
+        const vinculo: string[] = [];
+        const territorio: string[] = [];
+        const residencia: number[] = []; // años en barrio
+        // Satisfacción (R_P07..R_P20 → qIds 90011..90024 aprox)
+        const satisfItems: Record<string, number[]> = {};
+        // Frecuencia uso espacios (R_P22..R_P27)
+        const frecItems: Record<string, string[]> = {};
+        // Comportamiento adaptación (R_P28)
+        const comportamiento: string[] = [];
+        // Problemas percibidos (R_P29 múltiple)
+        const problemas: string[] = [];
+        // Impacto turismo (R_P30..R_P34)
+        const impactoItems: Record<string, number[]> = {};
+
+        // Mapeo de questionIds del seed v6 (residentes template 90001)
+        // P4 (género) = order 9 → qId 90013
+        // P5 (edad) = order 10 → qId 90014
+        // P3 (vínculo) = order 8 → qId 90012
+        // P1.0 (vive centro) = order 6 → qId 90006
+        // P2 (años residencia) = order 11 → qId 90015
+        // Satisfacción P6.01..P6.14 = orders 14..27 → qIds 90018..90031
+        // Frecuencia P7.01..P7.06 = orders 28..33 → qIds 90032..90037 (aproximado)
+        // Comportamiento P8 = order 34 → qId 90038
+        // Problemas P9 = order 35 → qId 90039
+        // Impacto P10..P14 = orders 36..40 → qIds 90040..90044
+
+        for (const r of res) {
+          const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
+          const ans = (raw as any[]) ?? [];
+
+          const g = getA(ans, 90013);
+          if (g) genero.push(g);
+          const e = getA(ans, 90014);
+          if (e) edad.push(e);
+          const v = getA(ans, 90012);
+          if (v) vinculo.push(v);
+          const tc = getA(ans, 90006);
+          if (tc) territorio.push(tc === "si" || tc === "1" ? "Centro histórico" : "Resto Sevilla");
+
+          // Satisfacción (P6.01..P6.14): qIds 90018..90031
+          const satisfLabels: Record<number, string> = {
+            90018: "Calidad vida", 90019: "Tranquilidad", 90020: "Limpieza",
+            90021: "Seguridad", 90022: "Transporte", 90023: "Comercio local",
+            90024: "Zonas verdes", 90025: "Ruido", 90026: "Accesibilidad",
+            90027: "Masificación", 90028: "Identidad barrio", 90029: "Relación vecinos",
+            90030: "Precio vivienda", 90031: "Servicios públicos",
+          };
+          for (const [qId, label] of Object.entries(satisfLabels)) {
+            const val = Number(getA(ans, Number(qId)));
+            if (!isNaN(val) && val > 0 && val <= 5) {
+              if (!satisfItems[label]) satisfItems[label] = [];
+              satisfItems[label].push(val);
+            }
+          }
+
+          // Frecuencia uso espacios (P7.01..P7.06): qIds 90032..90037
+          const frecLabels: Record<number, string> = {
+            90032: "Plazas/jardines", 90033: "Comercios locales", 90034: "Restaurantes/bares",
+            90035: "Monumentos", 90036: "Calles peatonales", 90037: "Mercados",
+          };
+          const FREC_ORDER = ["diario", "varias_semana", "1_semana", "menos_1_semana", "nunca"];
+          for (const [qId, label] of Object.entries(frecLabels)) {
+            const val = getA(ans, Number(qId));
+            if (val) {
+              if (!frecItems[label]) frecItems[label] = [];
+              frecItems[label].push(val);
+            }
+          }
+
+          // Comportamiento P8 = qId 90038
+          const comp = getA(ans, 90038);
+          if (comp) comportamiento.push(comp);
+
+          // Problemas P9 = qId 90039 (múltiple)
+          const prob = getA(ans, 90039);
+          if (prob) {
+            let arr: string[] = [];
+            try { arr = Array.isArray(prob) ? prob : JSON.parse(prob); } catch { arr = [prob]; }
+            problemas.push(...arr);
+          }
+
+          // Impacto P10..P14: qIds 90040..90044 (aproximado)
+          const impactoLabels: Record<number, string> = {
+            90040: "Actividad económica", 90041: "Empleo local", 90042: "Precios",
+            90043: "Cultura/patrimonio", 90044: "Convivencia",
+          };
+          for (const [qId, label] of Object.entries(impactoLabels)) {
+            const val = Number(getA(ans, Number(qId)));
+            if (!isNaN(val) && val > 0 && val <= 5) {
+              if (!impactoItems[label]) impactoItems[label] = [];
+              impactoItems[label].push(val);
+            }
+          }
+        }
+
+        const COMP_LABELS: Record<string, string> = {
+          no: "No cambia", evito_calles: "Evita calles", reducido_uso: "Reduce uso",
+          cambio_horario: "Cambia horario", otro: "Otro",
+        };
+        const PROB_LABELS: Record<string, string> = {
+          ruido: "Ruido", masificacion: "Masificación", suciedad: "Suciedad",
+          inseguridad_vial: "Inseg. vial", perdida_identidad: "Pérdida identidad",
+          aumento_precios: "Aumento precios", ninguna: "Ninguna", otro: "Otro",
+        };
+        const EDAD_LABELS: Record<string, string> = {
+          "18_29": "18-29", "30_44": "30-44", "45_64": "45-64", "65_75": "65-75", "76_mas": ">75",
+        };
+        const VINCULO_LABELS: Record<string, string> = {
+          si_yo: "Sí (yo)", si_otro: "Sí (familiar)", no: "No",
+        };
+
+        const relabel = (arr: string[], labels: Record<string, string>) =>
+          count(arr).map((d) => ({ ...d, name: labels[d.name] ?? d.name }));
+
+        return {
+          total: res.length,
+          genero: relabel(genero, { hombre: "Hombre", mujer: "Mujer", otro: "Otro" }),
+          edad: relabel(edad, EDAD_LABELS),
+          vinculo: relabel(vinculo, VINCULO_LABELS),
+          territorio: relabel(territorio, {}),
+          comportamiento: relabel(comportamiento, COMP_LABELS),
+          problemas: relabel(problemas, PROB_LABELS),
+          satisfaccion: Object.entries(satisfItems).map(([name, vals]) => ({ name, avg: avg(vals), n: vals.length })).sort((a, b) => b.avg - a.avg),
+          frecuencia: Object.entries(frecItems).map(([name, vals]) => {
+            const m: Record<string, number> = {};
+            for (const v of vals) m[v] = (m[v] ?? 0) + 1;
+            return { name, diario: m.diario ?? 0, varias_semana: m.varias_semana ?? 0, "1_semana": m["1_semana"] ?? 0, menos_1_semana: m.menos_1_semana ?? 0, nunca: m.nunca ?? 0 };
+          }),
+          impacto: Object.entries(impactoItems).map(([name, vals]) => ({ name, avg: avg(vals), n: vals.length })).sort((a, b) => b.avg - a.avg),
+        };
+      }),
+
+    // ── Estadísticas de conteos peatonales ────────────────────────────────
+    conteosStats: adminOrRevisorProcedure
+      .input(z.object({ dateFrom: z.date().optional(), dateTo: z.date().optional() }).optional())
+      .query(async ({ input }) => {
+        const { getDb } = await import('./db');
+        const { pedestrianPasses, countingSessions } = await import('../drizzle/schema');
+        const { sql, and, gte, lte } = await import('drizzle-orm');
+        const db = await getDb();
+        if (!db) return { total: 0, byPunto: [], byTramo: [], bySentido: [], sessions: [] };
+
+        const conditions: any[] = [];
+        if (input?.dateFrom) conditions.push(gte(pedestrianPasses.recordedAt, input.dateFrom));
+        if (input?.dateTo) conditions.push(lte(pedestrianPasses.recordedAt, input.dateTo));
+        const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+        // Total y por punto
+        const byPuntoRows = await db
+          .select({ punto: pedestrianPasses.surveyPoint, total: sql<number>`sum(${pedestrianPasses.count})`, registros: sql<number>`count(*)` })
+          .from(pedestrianPasses)
+          .where(where)
+          .groupBy(pedestrianPasses.surveyPoint);
+
+        // Por tramo de 30 min
+        const allCounts = await db.select().from(pedestrianPasses).where(where);
+        const byTramo: Record<string, number> = {};
+        for (const c of allCounts) {
+          if (!c.recordedAt) continue;
+          const d = new Date(c.recordedAt);
+          const h = d.getHours();
+          const m = d.getMinutes() < 30 ? "00" : "30";
+          const key = `${String(h).padStart(2, "0")}:${m}`;
+          byTramo[key] = (byTramo[key] ?? 0) + Number(c.count ?? 0);
+        }
+
+        // Por sentido (top 15)
+        const bySentidoRows = await db
+          .select({ sentido: pedestrianPasses.directionLabel, total: sql<number>`sum(${pedestrianPasses.count})` })
+          .from(pedestrianPasses)
+          .where(where)
+          .groupBy(pedestrianPasses.directionLabel);
+
+        // Sesiones
+        const sessionRows = await db.select().from(countingSessions);
+
+        const totalPersons = byPuntoRows.reduce((acc, r) => acc + Number(r.total ?? 0), 0);
+
+        return {
+          total: totalPersons,
+          byPunto: byPuntoRows.map((r) => ({ name: r.punto ?? "Sin punto", value: Number(r.total ?? 0), registros: Number(r.registros ?? 0) })).sort((a, b) => b.value - a.value),
+          byTramo: Object.entries(byTramo).sort(([a], [b]) => a.localeCompare(b)).map(([name, value]) => ({ name, value })),
+          bySentido: bySentidoRows.map((r) => ({ name: r.sentido ?? "Sin sentido", value: Number(r.total ?? 0) })).sort((a, b) => b.value - a.value).slice(0, 15),
+          sessions: sessionRows.map((s) => ({
+            punto: s.surveyPointName ?? s.surveyPointCode ?? "",
+            subpunto: s.subPointName ?? s.subPointCode ?? "",
+            encuestador: s.encuestadorName ?? "",
+            total: Number(s.totalPersons ?? 0),
+            inicio: s.startedAt ? new Date(s.startedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "",
+            fin: s.finishedAt ? new Date(s.finishedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "",
+          })),
+        };
+      }),
   }),
   // ─── Conteo Peatonall ───────────────────────────────────────────────────────────────────────────────
 
