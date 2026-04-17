@@ -15,7 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
-import { NOMBRES_BARRIO_TURISTICO, NOMBRES_OTRAS_CALLES } from "../../../shared/calles";
+import { NOMBRES_BARRIO_TURISTICO } from "../../../shared/calles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ function QuestionRenderer({
   photos,
   onPhoto,
   textOverride,
-  onNotResident,
+  onEarlyExit,
 }: {
   question: Question;
   lang?: "es" | "en";
@@ -127,7 +127,7 @@ function QuestionRenderer({
   photos: PhotoData[];
   onPhoto: (data: PhotoData) => void;
   textOverride?: { es: string; en?: string };
-  onNotResident?: (questionId: number) => void;
+  onEarlyExit?: () => void;
 }) {
   const textEs = textOverride?.es ?? question.text;
   const textEn = textOverride?.en ?? question.textEn ?? "";
@@ -239,14 +239,14 @@ function QuestionRenderer({
         />
       )}
 
-      {/* Text — P1.1 calle: desplegable especial */}
+      {/* Text — P1.1 calle: desplegable solo calles 037 + Otra */}
       {question.type === "text" && question.text.includes("P1.1") && (
         <div className="space-y-3">
           <select
-            value={answer === undefined || answer === null || (!NOMBRES_BARRIO_TURISTICO.includes(answer as string) && !NOMBRES_OTRAS_CALLES.includes(answer as string) && answer !== "") ? "__otra__" : (answer ?? "")}
+            value={NOMBRES_BARRIO_TURISTICO.includes(answer as string) ? (answer ?? "") : (answer ? "__otra__" : "")}
             onChange={(e) => {
               if (e.target.value === "__otra__") {
-                onAnswer(""); // limpia para que el usuario escriba
+                onAnswer("__otra__"); // marca que eligió Otra
               } else {
                 onAnswer(e.target.value);
               }
@@ -254,46 +254,38 @@ function QuestionRenderer({
             className="w-full border border-border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-ring bg-background"
           >
             <option value="">-- Seleccione una calle / Select a street --</option>
-            <optgroup label="Calles del barrio turístico (Sección 037)">
-              {NOMBRES_BARRIO_TURISTICO.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Otras calles del barrio">
-              {NOMBRES_OTRAS_CALLES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </optgroup>
+            {NOMBRES_BARRIO_TURISTICO.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
             <option value="__otra__">Otra calle / Other street</option>
           </select>
-          {/* Campo libre si elige "Otra calle" */}
-          {(answer !== undefined && answer !== null && answer !== "" && !NOMBRES_BARRIO_TURISTICO.includes(answer as string) && !NOMBRES_OTRAS_CALLES.includes(answer as string)) && (
-            <input
-              type="text"
-              value={answer as string}
-              onChange={(e) => onAnswer(e.target.value)}
-              placeholder="Escriba el nombre de la calle / Enter street name..."
-              className="w-full border border-border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-              autoFocus
-            />
-          )}
-          {onNotResident && (
+          {onEarlyExit && (
             <button
               type="button"
-              onClick={() => {
-                onNotResident(question.id);
-              }}
-              className="w-full py-3 px-4 rounded-xl border-2 border-destructive/60 text-destructive font-medium text-sm hover:bg-destructive/10 transition-colors"
+              onClick={onEarlyExit}
+              className="w-full py-3 px-4 rounded-xl border-2 border-destructive text-destructive font-semibold text-sm hover:bg-destructive hover:text-destructive-foreground transition-all"
             >
-              No es Residente de la zona objeto de estudio
-              <span className="block text-xs font-normal opacity-75 mt-0.5">Not a resident of the study area → End survey</span>
+              ❌ No es Residente de la zona objeto de estudio
+              <span className="block text-xs font-normal opacity-80 mt-0.5">Not a resident of the study area</span>
             </button>
           )}
         </div>
       )}
 
-      {/* Text — campo libre (resto de preguntas tipo text) */}
-      {question.type === "text" && !question.text.includes("P1.1") && (
+      {/* Text — P1.2: campo libre de calle */}
+      {question.type === "text" && question.text.includes("P1.2") && (
+        <input
+          type="text"
+          value={answer ?? ""}
+          onChange={(e) => onAnswer(e.target.value)}
+          placeholder="Escriba el nombre de la calle / Enter street name..."
+          className="w-full border border-border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+          autoFocus
+        />
+      )}
+
+      {/* Text — campo libre (resto de preguntas tipo text, no P1.1 ni P1.2) */}
+      {question.type === "text" && !question.text.includes("P1.1") && !question.text.includes("P1.2") && (
         <textarea
           value={answer ?? ""}
           onChange={(e) => onAnswer(e.target.value)}
@@ -505,18 +497,47 @@ export default function SurveyForm() {
     const ans = getAnswer(currentQuestion.id);
     if (ans === undefined || ans === null || ans === "") return false;
     if (Array.isArray(ans) && ans.length === 0) return false;
+    // P1.1: "__otra__" es válido (el usuario eligió Otra calle, irá a P1.2)
+    if (ans === "__otra__") return true;
     return true;
   };
 
-  // Lógica de salida anticipada: P1 de residentes (¿Reside habitualmente en este barrio?)
-  // Es la primera pregunta real (order 5 en el seed, pero la primera no-META)
+  // Lógica de salto para encuesta de residentes:
+  // step 1 = P1 (¿Es residente de Sevilla capital?)
+  // step 2 = P1.0 (¿Vive en el centro histórico?)
+  // step 3 = P1.1 (desplegable calles 037 + Otra)
+  // step 4 = P1.2 (campo libre de calle) — solo si P1.1 = "__otra__"
+  // step 5 = P1.3 (¿Trabaja en el centro histórico?)
+  // step 6+ = resto de preguntas
   const handleNext = () => {
-    if (isResidentes && currentStep === 1 && currentQuestion) {
+    if (isResidentes && currentQuestion) {
       const ans = getAnswer(currentQuestion.id);
-      if (ans === "no") {
-        // Guardar encuesta como salida anticipada y mostrar pantalla de fin
+
+      // P1: ¿Es residente de Sevilla capital? — No = fin encuesta
+      if (currentStep === 1 && ans === "no") {
         handleEarlyExit();
         return;
+      }
+
+      // P1.0: ¿Vive en el centro histórico? — No = salta a P1.3 (step 5)
+      if (currentStep === 2 && ans === "no") {
+        // Saltar P1.1 y P1.2, ir directamente a P1.3
+        setCurrentStep(5);
+        return;
+      }
+
+      // P1.1: desplegable calles 037 — si elige calle 037 = salta a P1.3 (step 5)
+      if (currentStep === 3) {
+        if (ans && ans !== "__otra__" && NOMBRES_BARRIO_TURISTICO.includes(ans as string)) {
+          // Calle del 037 seleccionada → saltar P1.2, ir a P1.3
+          setCurrentStep(5);
+          return;
+        }
+        // Si elige "Otra" → ir a P1.2 (step 4)
+        if (ans === "__otra__") {
+          setCurrentStep(4);
+          return;
+        }
       }
     }
     setCurrentStep((s) => s + 1);
@@ -812,7 +833,7 @@ export default function SurveyForm() {
               photos={photos.filter((p) => p.questionId === currentQuestion.id)}
               onPhoto={(d) => setPhotos((prev) => [...prev, d])}
               textOverride={p1bOverride}
-              onNotResident={isResidentes && currentQuestion.text.includes("P1.1") ? (qId: number) => handleEarlyExit([{ questionId: qId, answer: "No es residente de la zona objeto de estudio" }]) : undefined}
+              onEarlyExit={isResidentes && currentQuestion.text.includes("P1.1") ? handleEarlyExit : undefined}
             />
             {/* Navigation buttons */}
             <div className="flex gap-3 pt-2">

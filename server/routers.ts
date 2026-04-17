@@ -358,8 +358,8 @@ export const appRouter = router({
               const colName = `v_p${String(colIdx).padStart(2, "0")}`;
               flatCols[colName] = encodeAnswer(rawVal);
             } else {
-              // r_p01..r_p34 (normales) + r_p35a/b/c (múltiple, order 37 = colIdx 33)
-              if (colIdx === 33) {
+              // r_p01..r_p37 (normales) + r_p35a/b/c (múltiple, order 40 = colIdx 36)
+              if (colIdx === 36) {
                 // P13 múltiple: r_p35a, r_p35b, r_p35c
                 let vals: string[] = [];
                 try { vals = rawVal ? JSON.parse(rawVal) : []; } catch { vals = rawVal ? [rawVal] : []; }
@@ -372,11 +372,11 @@ export const appRouter = router({
               }
             }
           }
-          // Calcular seccion037 para residentes: r_p01 = ¿Vive en centro histórico? (1=Sí, 2=No)
-          // Si r_p01 = "1" (Sí) → seccion037 = 1 (Centro histórico)
-          // Si r_p01 = "2" (No) → seccion037 = 2 (Resto de Sevilla)
+          // Calcular seccion037 para residentes: r_p02 = P1.0 ¿Vive en centro histórico? (1=Sí, 2=No)
+          // Si r_p02 = "1" (Sí) → seccion037 = 1 (Centro histórico)
+          // Si r_p02 = "2" (No) → seccion037 = 2 (Resto de Sevilla)
           if (sType === "residentes") {
-            const viveCentro = flatCols["r_p01"] as string | null;
+            const viveCentro = flatCols["r_p02"] as string | null;
             if (viveCentro === "1" || viveCentro?.toLowerCase() === "si" || viveCentro?.toLowerCase() === "sí") {
               flatCols["seccion037"] = "1";
             } else if (viveCentro === "2" || viveCentro?.toLowerCase() === "no") {
@@ -513,9 +513,9 @@ export const appRouter = router({
               const rawAns = (answerByOrder[q.order] ?? null) as string | null;
               flatRow[colName] = encodeAnswer(rawAns);
             }
-            // Calcular seccion037 para residentes: r01 = ¿Vive en centro histórico? (1=Sí, 2=No)
+            // Calcular seccion037 para residentes: r02 = P1.0 ¿Vive en centro histórico? (1=Sí, 2=No)
             if (surveyType2 === "residentes") {
-              const viveCentro = flatRow["r01"] as string | null;
+              const viveCentro = flatRow["r02"] as string | null;
               if (viveCentro === "1" || viveCentro?.toLowerCase() === "si" || viveCentro?.toLowerCase() === "sí") {
                 flatRow["seccion037"] = 1;
               } else if (viveCentro === "2" || viveCentro?.toLowerCase() === "no") {

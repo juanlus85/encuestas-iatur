@@ -1,67 +1,75 @@
 -- ============================================================
--- MIGRACIÓN PRODUCCIÓN: Encuesta Residentes v6
--- Cambios:
---   1. P1 cambia de "¿Reside habitualmente?" a "¿Vive en el centro histórico?"
---   2. P1.1 mantiene el desplegable de calles (solo si P1=Sí)
---   3. Nueva P1.2 "¿Trabaja en el centro histórico?" (order 7)
---   4. Desplazar orders 7→8, 8→9, ... para hacer hueco a P1.2
---   5. Cuotas: centro histórico 210, resto Sevilla 90
---   6. seccion037: cambiar de boolean a int (1=centro histórico, 2=resto)
+-- SQL PRODUCCIÓN: Encuesta Residentes v6
+-- Fecha: 2026-04-17
+-- INSTRUCCIONES:
+--   1. Ejecutar en la BD de producción ANTES de publicar
+--   2. Sustituir @TEMPLATE_ID por el ID real del template de residentes en producción
+--      (ejecutar: SELECT id FROM survey_templates WHERE type='residentes')
+--   3. Si ya hay encuestas grabadas con el template anterior, NO borrar las preguntas
+--      antiguas directamente — usar UPDATE para los textos y INSERT para las nuevas.
 -- ============================================================
 
--- PASO 1: Actualizar el campo seccion037 de boolean a int en producción
-ALTER TABLE `survey_responses`
-  MODIFY COLUMN `seccion037` int DEFAULT 0;
+-- PASO 1: Obtener el ID del template de residentes en producción
+-- SELECT @TEMPLATE_ID := id FROM survey_templates WHERE type = 'residentes';
+-- (o usar SET @TEMPLATE_ID = <id_obtenido>;)
 
-ALTER TABLE `survey_responses_flat`
-  MODIFY COLUMN `seccion037` int DEFAULT 0;
+-- PASO 2: Borrar las preguntas antiguas del template de residentes
+DELETE FROM questions WHERE templateId = @TEMPLATE_ID;
 
--- PASO 2: Obtener el templateId de la encuesta de residentes
--- (Ejecuta primero este SELECT para obtener el ID y usarlo en los pasos siguientes)
-SELECT id, name, type FROM survey_templates WHERE type = 'residentes';
+-- PASO 3: Insertar las nuevas preguntas (v6 con 41 preguntas)
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 1, 'text', 'META: Código cuestionario', 'META: Questionnaire code', NULL, 0, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 2, 'single_choice', 'META: Punto de encuesta', 'META: Survey point', '[{"label":"01 Virgen de los Reyes","value":"01"},{"label":"02 Mateos Gago","value":"02"},{"label":"03 Patio de Banderas","value":"03"},{"label":"04 Agua/Vida","value":"04"},{"label":"05 Plaza Alfaro","value":"05"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 3, 'single_choice', 'META: Bloque horario', 'META: Time block', '[{"label":"Mañana (9:30–12:00)","value":"manana"},{"label":"Mediodía (12:00–14:30)","value":"mediodia"},{"label":"Tarde (16:00–18:30)","value":"tarde"},{"label":"Noche (18:30–21:00)","value":"noche"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 4, 'single_choice', 'META: Ventana (tramo 30 min)', 'META: Window (30-min slot)', '[{"label":"V1 (0–30 min)","value":"V1"},{"label":"V2 (30–60 min)","value":"V2"},{"label":"V3 (60–90 min)","value":"V3"},{"label":"V4 (90–120 min)","value":"V4"},{"label":"V5 (120–150 min)","value":"V5"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 5, 'yes_no', 'P1. ¿Es residente de Sevilla capital? (Si NO → fin de encuesta)', 'P1. Are you a resident of Seville city? (If NO → end survey)', NULL, 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 6, 'yes_no', 'P1.0. ¿Vive en el centro histórico?', 'P1.0. Do you live in the historic centre?', NULL, 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 7, 'text', 'P1.1. ¿En qué calle del centro histórico reside? (Seleccione del listado)', 'P1.1. Which street in the historic centre do you live on? (Select from list)', NULL, 0, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 8, 'text', 'P1.2. ¿En qué calle?', 'P1.2. Which street?', NULL, 0, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 9, 'yes_no', 'P1.3. ¿Trabaja en el centro histórico?', 'P1.3. Do you work in the historic centre?', NULL, 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 10, 'single_choice', 'P2. ¿Cuántos años lleva viviendo en Sevilla?', 'P2. How many years have you lived in Seville?', '[{"label":"Menos de 1 año","value":"menos_1"},{"label":"1–5 años","value":"1_5"},{"label":"6–15 años","value":"6_15"},{"label":"Más de 15 años","value":"mas_15"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 11, 'single_choice', 'P3. ¿Percibe usted, o algún miembro de su hogar, beneficios económicos del sector turístico? (hotel, alojamiento, restaurantes, transporte turístico, agencias, museos, guías...)', 'P3. Do you or any household member receive income from tourism-related activities?', '[{"label":"Sí, yo","value":"si_yo"},{"label":"Sí, otra persona del hogar","value":"si_otro"},{"label":"No","value":"no"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 12, 'single_choice', 'P4. Género', 'P4. Gender', '[{"label":"Mujer","value":"mujer"},{"label":"Hombre","value":"hombre"},{"label":"Otro / prefiero no decirlo","value":"otro"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 13, 'single_choice', 'P5. Edad', 'P5. Age', '[{"label":"18–29","value":"18_29"},{"label":"30–44","value":"30_44"},{"label":"45–64","value":"45_64"},{"label":"65–75","value":"65_75"},{"label":"76 o más","value":"76_mas"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 14, 'scale', 'P6.01. El turismo mejora la economía local y aumenta las posibilidades de empleo (1=Totalmente desacuerdo, 5=Totalmente de acuerdo)', 'P6.01. Tourism improves the local economy and increases employment opportunities', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 15, 'scale', 'P6.02. El turismo genera congestión en el espacio, infraestructuras o servicios públicos (transporte, sanidad, basura, etc.)', 'P6.02. Tourism generates congestion in public spaces, infrastructure or services', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 16, 'scale', 'P6.03. El turismo atrae nuevos inversores', 'P6.03. Tourism attracts new investors', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 17, 'scale', 'P6.04. El turismo encarece el precio de las viviendas (alquiler y venta)', 'P6.04. Tourism increases housing prices', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 18, 'scale', 'P6.05. El turismo aumenta la calidad de vida de la población residente', 'P6.05. Tourism increases the quality of life of the resident population', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 19, 'scale', 'P6.06. El turismo está provocando desplazamientos de la población local a zonas alejadas del centro', 'P6.06. Tourism is causing displacement of the local population', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 20, 'scale', 'P6.07. El turismo ayuda a mejorar el prestigio e imagen de mi ciudad', 'P6.07. Tourism helps improve the prestige and image of my city', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 21, 'scale', 'P6.08. El turismo contribuye a la pérdida de identidad, cultura y tradiciones del municipio', 'P6.08. Tourism contributes to the loss of identity, culture and traditions', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 22, 'scale', 'P6.09. El turismo ayuda a conservar y revalorizar los monumentos', 'P6.09. Tourism helps conserve and enhance monuments', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 23, 'scale', 'P6.10. El turismo trae consigo un aumento del tráfico en mi ciudad y falta de aparcamiento', 'P6.10. Tourism brings increased traffic and lack of parking', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 24, 'scale', 'P6.11. El turismo incrementa las opciones de ocio', 'P6.11. Tourism increases leisure options', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 25, 'scale', 'P6.12. El turismo mejora servicios (limpieza o seguridad) de la ciudad', 'P6.12. Tourism improves city services (cleaning or security)', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 26, 'scale', 'P6.13. El turismo consume recursos (agua, energía, suelo, etc.) que condiciona el uso a la población residente', 'P6.13. Tourism consumes resources that limit their use by residents', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 27, 'scale', 'P6.14. El turismo aumenta los niveles de contaminación (acústica, lumínica, etc.) y la suciedad', 'P6.14. Tourism increases pollution levels and dirtiness', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 28, 'scale', 'P6.15. El turismo contribuye a crear una sociedad más tolerante y multicultural', 'P6.15. Tourism contributes to creating a more tolerant and multicultural society', '[{"label":"1 – Totalmente desacuerdo","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5 – Totalmente de acuerdo","value":"5"},{"label":"NS/NC","value":"ns"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 29, 'single_choice', 'P7a. Frecuencia: Ir a comercios o servicios de proximidad', 'P7a. Frequency: Going to local shops or services', '[{"label":"Diario","value":"diario"},{"label":"Varias veces/semana","value":"varias_semana"},{"label":"1 vez/semana","value":"1_semana"},{"label":"Menos de 1 vez/semana","value":"menos_1_semana"},{"label":"Nunca","value":"nunca"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 30, 'single_choice', 'P7b. Frecuencia: Acompañamiento escolar o familiar', 'P7b. Frequency: School or family accompaniment', '[{"label":"Diario","value":"diario"},{"label":"Varias veces/semana","value":"varias_semana"},{"label":"1 vez/semana","value":"1_semana"},{"label":"Menos de 1 vez/semana","value":"menos_1_semana"},{"label":"Nunca","value":"nunca"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 31, 'single_choice', 'P7c. Frecuencia: Ocio o actividades comunitarias (asociaciones)', 'P7c. Frequency: Leisure or community activities', '[{"label":"Diario","value":"diario"},{"label":"Varias veces/semana","value":"varias_semana"},{"label":"1 vez/semana","value":"1_semana"},{"label":"Menos de 1 vez/semana","value":"menos_1_semana"},{"label":"Nunca","value":"nunca"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 32, 'single_choice', 'P7d. Frecuencia: Trayectos al trabajo', 'P7d. Frequency: Commuting to work', '[{"label":"Diario","value":"diario"},{"label":"Varias veces/semana","value":"varias_semana"},{"label":"1 vez/semana","value":"1_semana"},{"label":"Menos de 1 vez/semana","value":"menos_1_semana"},{"label":"Nunca","value":"nunca"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 33, 'single_choice', 'P7e. Frecuencia: Uso de transporte público (metro, bus, tranvía)', 'P7e. Frequency: Use of public transport', '[{"label":"Diario","value":"diario"},{"label":"Varias veces/semana","value":"varias_semana"},{"label":"1 vez/semana","value":"1_semana"},{"label":"Menos de 1 vez/semana","value":"menos_1_semana"},{"label":"Nunca","value":"nunca"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 34, 'single_choice', 'P7f. Frecuencia: Circulación a pie o en bicicleta', 'P7f. Frequency: Walking or cycling', '[{"label":"Diario","value":"diario"},{"label":"Varias veces/semana","value":"varias_semana"},{"label":"1 vez/semana","value":"1_semana"},{"label":"Menos de 1 vez/semana","value":"menos_1_semana"},{"label":"Nunca","value":"nunca"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 35, 'single_choice', 'P8. ¿Ha modificado su comportamiento por la presencia de turistas en los últimos años?', 'P8. Have you modified your behaviour due to the presence of tourists in recent years?', '[{"label":"Sí, evito ciertas calles o plazas","value":"evito_calles"},{"label":"Sí, cambio de horario habitualmente","value":"cambio_horario"},{"label":"Sí, he reducido el uso de algún espacio","value":"reducido_uso"},{"label":"No, no he cambiado mis hábitos","value":"no"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 36, 'multiple_choice', 'P9. ¿Ha experimentado alguna de estas situaciones en el último mes? (Múltiple respuesta)', 'P9. Have you experienced any of these situations in the last month? (Multiple choice)', '[{"label":"Dificultad para caminar por saturación","value":"dificultad_caminar"},{"label":"Sensación de inseguridad vial","value":"inseguridad_vial"},{"label":"Ruido o actividades molestas","value":"ruido"},{"label":"Cambios en sus rutas habituales","value":"cambios_rutas"},{"label":"Dificultad de acceso a comercios/servicios","value":"dificultad_acceso"},{"label":"Sensación de pérdida de identidad del barrio","value":"perdida_identidad"},{"label":"Ninguna de las anteriores","value":"ninguna"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 37, 'scale', 'P10. ¿La presencia turística ha cambiado su uso habitual del espacio público? (1=Nada, 5=Muchísimo)', 'P10. Has the tourist presence changed your usual use of public space? (1=Not at all, 5=A lot)', '[{"label":"1 – Nada","value":"1"},{"label":"2 – Poco","value":"2"},{"label":"3 – Algo","value":"3"},{"label":"4 – Mucho","value":"4"},{"label":"5 – Muchísimo","value":"5"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 38, 'scale', 'P11. ¿Cómo considera que le afecta personalmente el turismo? (1=Muy negativo, 5=Muy positivo)', 'P11. How do you think tourism personally affects you? (1=Very negative, 5=Very positive)', '[{"label":"1 – Muy negativo","value":"1"},{"label":"2 – Algo negativo","value":"2"},{"label":"3 – Neutral","value":"3"},{"label":"4 – Algo positivo","value":"4"},{"label":"5 – Muy positivo","value":"5"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 39, 'scale', 'P12. ¿Cómo considera que afecta el turismo a su comunidad? (1=Muy negativo, 5=Muy positivo)', 'P12. How do you think tourism affects your community? (1=Very negative, 5=Very positive)', '[{"label":"1 – Muy negativo","value":"1"},{"label":"2 – Algo negativo","value":"2"},{"label":"3 – Neutral","value":"3"},{"label":"4 – Algo positivo","value":"4"},{"label":"5 – Muy positivo","value":"5"}]', 1, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 40, 'multiple_choice', 'P13. ¿Qué medidas deberían priorizarse para mejorar la movilidad y la convivencia? (Hasta 3 opciones)', 'P13. What measures should be prioritised to improve mobility and coexistence? (Up to 3 options)', '[{"label":"Control y regulación de grupos organizados","value":"control_grupos"},{"label":"Ampliación de zonas peatonales","value":"zonas_peatonales"},{"label":"Regulación de accesos o tráfico","value":"regulacion_accesos"},{"label":"Señalización y rutas turísticas dirigidas","value":"senalizacion"},{"label":"Campañas de sensibilización (turistas y vecinos)","value":"sensibilizacion"},{"label":"Limitación horaria de actividades turísticas","value":"limitacion_horaria"},{"label":"Mayor presencia de agentes de movilidad (policía)","value":"agentes_movilidad"},{"label":"Otra (especificar)","value":"otra"}]', 0, 0);
+INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto) VALUES (@TEMPLATE_ID, 41, 'text', 'P14. ¿Desea añadir alguna observación o comentario final?', 'P14. Would you like to add any final observation or comment?', NULL, 0, 0);
 
--- PASO 3: Desplazar orders 7 en adelante para hacer hueco a P1.2
--- Sustituye {TEMPLATE_ID} por el ID obtenido en el paso anterior
-UPDATE questions
-  SET `order` = `order` + 1
-  WHERE templateId = {TEMPLATE_ID}
-    AND `order` >= 7
-  ORDER BY `order` DESC;
-
--- PASO 4: Actualizar P1 (order 5) — cambiar texto
-UPDATE questions
-  SET text = 'P1. ¿Vive en el centro histórico de Sevilla? (Si NO → continúa con P1.2)',
-      textEn = 'P1. Do you live in the historic centre of Seville? (If NO → continue with P1.2)',
-      options = '[{"value":"si","label":"Sí / Yes"},{"value":"no","label":"No"}]'
-  WHERE templateId = {TEMPLATE_ID} AND `order` = 5;
-
--- PASO 5: Actualizar P1.1 (order 6) — mantener desplegable de calles
-UPDATE questions
-  SET text = 'P1.1. ¿En qué calle reside? (Solo si vive en el centro histórico)',
-      textEn = 'P1.1. Which street do you live on? (Only if you live in the historic centre)'
-  WHERE templateId = {TEMPLATE_ID} AND `order` = 6;
-
--- PASO 6: Insertar nueva P1.2 (order 7) — ¿Trabaja en el centro histórico?
-INSERT INTO questions (templateId, `order`, type, text, textEn, options, isRequired, requiresPhoto)
-VALUES (
-  {TEMPLATE_ID},
-  7,
-  'yes_no',
-  'P1.2. ¿Trabaja en el centro histórico de Sevilla?',
-  'P1.2. Do you work in the historic centre of Seville?',
-  '[{"value":"si","label":"Sí / Yes"},{"value":"no","label":"No"}]',
-  1,
-  0
-);
-
--- PASO 7: Actualizar cuotas en survey_templates
+-- PASO 4: Actualizar descripción y targetCount del template
 UPDATE survey_templates
-  SET description = 'Cuota: 210 residentes centro histórico + 90 resto de Sevilla = 300 total',
-      targetCount = 300
-  WHERE id = {TEMPLATE_ID};
+SET description = 'Opinión de los residentes sobre los efectos del turismo. Barrio de Santa Cruz, Sevilla 2026. N=300.',
+    targetCount = 300
+WHERE id = @TEMPLATE_ID;
 
--- PASO 8: Verificar el resultado
-SELECT `order`, type, text FROM questions
-  WHERE templateId = {TEMPLATE_ID}
-  ORDER BY `order`
-  LIMIT 12;
+-- PASO 5: Verificación
+SELECT COUNT(*) AS total_preguntas FROM questions WHERE templateId = @TEMPLATE_ID;
+-- Debe devolver: 41
+
+SELECT `order`, type, LEFT(text, 60) AS texto
+FROM questions
+WHERE templateId = @TEMPLATE_ID
+ORDER BY `order`;
