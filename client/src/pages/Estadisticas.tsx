@@ -928,12 +928,8 @@ const TABS = [
 ];
 
 export default function Estadisticas() {
-  const today = new Date();
-  const defaultFrom = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
-  const defaultTo = today.toISOString().split("T")[0];
-
-  const [dateFrom, setDateFrom] = useState(defaultFrom);
-  const [dateTo, setDateTo] = useState(defaultTo);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [activeTab, setActiveTab] = useState("general");
 
   return (
