@@ -990,35 +990,32 @@ export const appRouter = router({
         if (input?.dateTo) conditions.push(lte(pedestrianPasses.recordedAt, input.dateTo));
         const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-        // Total y por punto principal (agrupado por surveyPointCode)
+        // Total y por punto principal (agrupado SOLO por surveyPointCode)
         const byPuntoRows = await db
           .select({
             puntoCode: pedestrianPasses.surveyPointCode,
-            puntoName: pedestrianPasses.surveyPoint,
             total: sql<number>`sum(${pedestrianPasses.count})`,
             registros: sql<number>`count(*)`
           })
           .from(pedestrianPasses)
           .where(where)
-          .groupBy(pedestrianPasses.surveyPointCode, pedestrianPasses.surveyPoint);
+          .groupBy(pedestrianPasses.surveyPointCode);
 
-        // Consolidar por código de punto (sumar todos los flujos del mismo punto)
+        // Consolidar: inicializar todos los puntos con 0 y acumular los reales
         const { SURVEY_POINTS } = await import('../shared/surveyPoints');
         const puntoMap = new Map<string, { name: string; value: number; registros: number }>();
-        // Inicializar todos los puntos con 0
         for (const p of SURVEY_POINTS) {
           puntoMap.set(p.code, { name: p.fullName, value: 0, registros: 0 });
         }
-        // Acumular los conteos reales
         for (const r of byPuntoRows) {
-          const code = r.puntoCode ?? (r.puntoName ?? "").substring(0, 2);
+          const code = (r.puntoCode ?? "").trim();
+          if (!code) continue;
           const existing = puntoMap.get(code);
           if (existing) {
             existing.value += Number(r.total ?? 0);
             existing.registros += Number(r.registros ?? 0);
           } else {
-            // Punto no registrado en SURVEY_POINTS, añadirlo igualmente
-            puntoMap.set(code, { name: r.puntoName ?? code, value: Number(r.total ?? 0), registros: Number(r.registros ?? 0) });
+            puntoMap.set(code, { name: code, value: Number(r.total ?? 0), registros: Number(r.registros ?? 0) });
           }
         }
 
