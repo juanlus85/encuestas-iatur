@@ -134,6 +134,13 @@
       "when": 1776447049541,
       "tag": "0018_strange_tarot",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1776525153795,
+      "tag": "0019_lyrical_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

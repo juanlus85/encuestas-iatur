@@ -132,11 +132,11 @@ export const surveyResponses = mysqlTable("survey_responses", {
   // P10. Gasto aproximado hoy en Sevilla
   v_p13: varchar("v_p13", { length: 64 }),
   // P11. Densidad percibida (1-5)
-  v_p14: varchar("v_p14", { length: 8 }),
+  v_p14: varchar("v_p14", { length: 64 }),
   // P12. Satisfacción general (1-5)
-  v_p15: varchar("v_p15", { length: 8 }),
+  v_p15: varchar("v_p15", { length: 64 }),
   // P13. Adaptación del espacio (1-5)
-  v_p16: varchar("v_p16", { length: 8 }),
+  v_p16: varchar("v_p16", { length: 64 }),
   // P14. ¿Volvería?
   v_p17: varchar("v_p17", { length: 64 }),
   // P15. ¿Recomendaría?
