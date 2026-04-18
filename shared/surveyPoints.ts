@@ -13,6 +13,10 @@
  *  03. Patio de Banderas   → 03.01 Plaza del Triunfo, 03.02 Judería                                   (4 flujos)
  *  04. Agua / Vida         → 04.01 Vida, 04.02 Callejón Susona, 04.03 Pimienta, 04.04 Justino de Neve (8 flujos)
  *  05. Plaza de Alfaro     → 05.01 López de Rueda, 05.02 Plaza Sta. Cruz, 05.03 Antonio el Bailarín, 05.04 Agua (8 flujos)
+ *  06. Plaza Refinadores    → 06.01 Mariscal, 06.02 Mezquita                                            (4 flujos)
+ *  07. Sta. Mª la Blanca    → 07.01 Doncellas                                                           (2 flujos)
+ *  08. Ximenez de Enciso    → 08.01 Fabiola                                                             (2 flujos)
+ *  09. Pl. Venerables       → 09.01 Jamerdana, 09.02 Justino de Neva, 09.03 Gloria                     (6 flujos)
  */
 
 export interface SurveySubPoint {
@@ -81,6 +85,41 @@ export const SURVEY_POINTS: SurveyPoint[] = [
       { code: "05.02", name: "Plaza Sta. Cruz",       fullName: "05.02 Plaza Sta. Cruz" },
       { code: "05.03", name: "Antonio el Bailarín",  fullName: "05.03 Antonio el Bailarín" },
       { code: "05.04", name: "Agua",                  fullName: "05.04 Agua" },
+    ],
+  },
+  {
+    code: "06",
+    name: "Plaza Refinadores",
+    fullName: "06 Plaza Refinadores",
+    subPoints: [
+      { code: "06.01", name: "Mariscal", fullName: "06.01 Mariscal" },
+      { code: "06.02", name: "Mezquita", fullName: "06.02 Mezquita" },
+    ],
+  },
+  {
+    code: "07",
+    name: "Sta. Mª la Blanca",
+    fullName: "07 Sta. Mª la Blanca",
+    subPoints: [
+      { code: "07.01", name: "Doncellas", fullName: "07.01 Doncellas" },
+    ],
+  },
+  {
+    code: "08",
+    name: "Ximenez de Enciso",
+    fullName: "08 Ximenez de Enciso",
+    subPoints: [
+      { code: "08.01", name: "Fabiola", fullName: "08.01 Fabiola" },
+    ],
+  },
+  {
+    code: "09",
+    name: "Pl. Venerables",
+    fullName: "09 Pl. Venerables",
+    subPoints: [
+      { code: "09.01", name: "Jamerdana",       fullName: "09.01 Jamerdana" },
+      { code: "09.02", name: "Justino de Neva", fullName: "09.02 Justino de Neva" },
+      { code: "09.03", name: "Gloria",          fullName: "09.03 Gloria" },
     ],
   },
 ];
