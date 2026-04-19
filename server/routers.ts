@@ -841,95 +841,125 @@ export const appRouter = router({
         const getA = (answers: any[], qId: number) => answers.find((a: any) => a.questionId === qId)?.answer;
         const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : 0;
 
+        // ── Lookup dinámico de questionIds por texto de pregunta ──────────────
+        // Buscar el template de residentes activo y cargar sus preguntas
+        const { getDb } = await import('./db');
+        const { questions: questionsTable, surveyTemplates: templatesTable } = await import('../drizzle/schema');
+        const { eq: eqOp, like } = await import('drizzle-orm');
+        const db = await getDb();
+
+        // Mapa: prefijo de texto → questionId (se rellena dinámicamente)
+        const qMap: Record<string, number> = {};
+        if (db) {
+          // Buscar templateId de residentes
+          const tmplRows = await db.select().from(templatesTable)
+            .where(eqOp(templatesTable.type, 'residentes')).limit(1);
+          if (tmplRows.length > 0) {
+            const tmplId = tmplRows[0].id;
+            const qRows = await db.select().from(questionsTable)
+              .where(eqOp(questionsTable.templateId, tmplId));
+            for (const q of qRows) {
+              const t = q.text ?? '';
+              // Mapear por prefijo de pregunta (P4, P5, P3, P1.0, P2, P6.01..P6.15, P7a..P7f, P8, P9, P10, P11, P12)
+              const prefixes = [
+                'P4.', 'P5.', 'P3.', 'P1.0.', 'P2.', 'P1.1.', 'P1.2.', 'P1.3.',
+                'P6.01', 'P6.02', 'P6.03', 'P6.04', 'P6.05', 'P6.06', 'P6.07',
+                'P6.08', 'P6.09', 'P6.10', 'P6.11', 'P6.12', 'P6.13', 'P6.14', 'P6.15',
+                'P7a.', 'P7b.', 'P7c.', 'P7d.', 'P7e.', 'P7f.',
+                'P8.', 'P9.', 'P10.', 'P11.', 'P12.',
+              ];
+              for (const pfx of prefixes) {
+                if (t.startsWith(pfx)) { qMap[pfx] = q.id; break; }
+              }
+              // También mapear P1 sin punto (P1. ¿Es residente...)
+              if (t.startsWith('P1. ') || t.startsWith('P1.¿')) qMap['P1.'] = q.id;
+            }
+          }
+        }
+
+        // Helper para obtener qId por prefijo
+        const qId = (pfx: string) => qMap[pfx] ?? -1;
+
         const genero: string[] = [];
         const edad: string[] = [];
         const vinculo: string[] = [];
         const territorio: string[] = [];
-        const residencia: number[] = []; // años en barrio
-        // Satisfacción (R_P07..R_P20 → qIds 90011..90024 aprox)
         const satisfItems: Record<string, number[]> = {};
-        // Frecuencia uso espacios (R_P22..R_P27)
         const frecItems: Record<string, string[]> = {};
-        // Comportamiento adaptación (R_P28)
         const comportamiento: string[] = [];
-        // Problemas percibidos (R_P29 múltiple)
         const problemas: string[] = [];
-        // Impacto turismo (R_P30..R_P34)
         const impactoItems: Record<string, number[]> = {};
 
-        // Mapeo de questionIds del seed v6 (residentes template 90001)
-        // P4 (género) = order 12 → qId 90012
-        // P5 (edad) = order 13 → qId 90013
-        // P3 (beneficios) = order 11 → qId 90011
-        // P1.0 (vive centro) = order 6 → qId 90006
-        // P2 (años residencia) = order 10 → qId 90010
-        // Satisfacción P6.01..P6.15 = orders 14..28 → qIds 90014..90028
-        // Frecuencia P7a..P7f = orders 29..34 → qIds 90029..90034
-        // Comportamiento P8 = order 35 → qId 90035
-        // Problemas P9 = order 36 → qId 90036 (múltiple)
-        // Impacto P10..P12 = orders 37..39 → qIds 90037..90039 (escala)
-        // Medidas P13 = order 40 → qId 90040 (múltiple)
+        // Labels de satisfacción P6.01..P6.15 (por prefijo)
+        const satisfPrefixes: [string, string][] = [
+          ['P6.01', 'Economía local'], ['P6.02', 'Congestión'], ['P6.03', 'Nuevos inversores'],
+          ['P6.04', 'Precio vivienda'], ['P6.05', 'Calidad de vida'], ['P6.06', 'Desplazamiento vecinos'],
+          ['P6.07', 'Prestigio ciudad'], ['P6.08', 'Pérdida identidad'], ['P6.09', 'Conservación monumentos'],
+          ['P6.10', 'Tráfico'], ['P6.11', 'Opciones ocio'], ['P6.12', 'Mejora servicios'],
+          ['P6.13', 'Consumo recursos'], ['P6.14', 'Contaminación'], ['P6.15', 'Tolerancia'],
+        ];
+        // Labels de frecuencia P7a..P7f
+        const frecPrefixes: [string, string][] = [
+          ['P7a.', 'Comercios proximidad'], ['P7b.', 'Acomp. escolar'], ['P7c.', 'Ocio comunitario'],
+          ['P7d.', 'Trayectos trabajo'], ['P7e.', 'Transporte público'], ['P7f.', 'A pie/bicicleta'],
+        ];
+        // Labels de impacto P10..P12
+        const impactoPrefixes: [string, string][] = [
+          ['P10.', 'Cambio uso espacio'], ['P11.', 'Impacto personal'], ['P12.', 'Impacto comunidad'],
+        ];
 
         for (const r of res) {
           const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
           const ans = (raw as any[]) ?? [];
 
-          const g = getA(ans, 90012);
+          const g = getA(ans, qId('P4.'));
           if (g) genero.push(g);
-          const e = getA(ans, 90013);
+          const e = getA(ans, qId('P5.'));
           if (e) edad.push(e);
-          const v = getA(ans, 90011);
+          const v = getA(ans, qId('P3.'));
           if (v) vinculo.push(v);
-          const tc = getA(ans, 90006);
+          const tc = getA(ans, qId('P1.0.'));
           if (tc) territorio.push(tc === "si" || tc === "1" ? "Centro histórico" : "Resto Sevilla");
 
-          // Satisfacción P6.01..P6.15 (escalas 1-5): qIds 90014..90028
-          const satisfLabels: Record<number, string> = {
-            90014: "Economía local", 90015: "Congestión", 90016: "Nuevos inversores",
-            90017: "Precio vivienda", 90018: "Calidad de vida", 90019: "Desplazamiento vecinos",
-            90020: "Prestigio ciudad", 90021: "Pérdida identidad", 90022: "Conservación monumentos",
-            90023: "Tráfico", 90024: "Opciones ocio", 90025: "Mejora servicios",
-            90026: "Consumo recursos", 90027: "Contaminación", 90028: "Tolerancia",
-          };
-          for (const [qId, label] of Object.entries(satisfLabels)) {
-            const val = Number(getA(ans, Number(qId)));
+          // Satisfacción P6.01..P6.15
+          for (const [pfx, label] of satisfPrefixes) {
+            const id = qId(pfx);
+            if (id < 0) continue;
+            const val = Number(getA(ans, id));
             if (!isNaN(val) && val > 0 && val <= 5) {
               if (!satisfItems[label]) satisfItems[label] = [];
               satisfItems[label].push(val);
             }
           }
 
-          // Frecuencia uso espacios P7a..P7f: qIds 90029..90034
-          const frecLabels: Record<number, string> = {
-            90029: "Comercios proximidad", 90030: "Acomp. escolar", 90031: "Ocio comunitario",
-            90032: "Trayectos trabajo", 90033: "Transporte público", 90034: "A pie/bicicleta",
-          };
-          for (const [qId, label] of Object.entries(frecLabels)) {
-            const val = getA(ans, Number(qId));
+          // Frecuencia P7a..P7f
+          for (const [pfx, label] of frecPrefixes) {
+            const id = qId(pfx);
+            if (id < 0) continue;
+            const val = getA(ans, id);
             if (val) {
               if (!frecItems[label]) frecItems[label] = [];
               frecItems[label].push(val);
             }
           }
 
-          // Comportamiento P8 = qId 90035
-          const comp = getA(ans, 90035);
+          // Comportamiento P8
+          const comp = getA(ans, qId('P8.'));
           if (comp) comportamiento.push(comp);
 
-          // Problemas P9 = qId 90036 (múltiple)
-          const prob = getA(ans, 90036);
+          // Problemas P9 (múltiple)
+          const prob = getA(ans, qId('P9.'));
           if (prob) {
             let arr: string[] = [];
             try { arr = Array.isArray(prob) ? prob : JSON.parse(prob); } catch { arr = [prob]; }
             problemas.push(...arr);
           }
 
-          // Impacto P10..P12 (escala 1-5): qIds 90037..90039
-          const impactoLabels: Record<number, string> = {
-            90037: "Cambio uso espacio", 90038: "Impacto personal", 90039: "Impacto comunidad",
-          };
-          for (const [qId, label] of Object.entries(impactoLabels)) {
-            const val = Number(getA(ans, Number(qId)));
+          // Impacto P10..P12
+          for (const [pfx, label] of impactoPrefixes) {
+            const id = qId(pfx);
+            if (id < 0) continue;
+            const val = Number(getA(ans, id));
             if (!isNaN(val) && val > 0 && val <= 5) {
               if (!impactoItems[label]) impactoItems[label] = [];
               impactoItems[label].push(val);
@@ -957,8 +987,35 @@ export const appRouter = router({
         const relabel = (arr: string[], labels: Record<string, string>) =>
           count(arr).map((d) => ({ ...d, name: labels[d.name] ?? d.name }));
 
+        // Centro histórico: contar encuestas donde P1.0 = 'si' o P1.1 tiene valor
+        const centroHistorico = res.filter((r) => {
+          const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
+          const ans = (raw as any[]) ?? [];
+          const tc = getA(ans, qId('P1.0.'));
+          return tc === 'si' || tc === '1' || tc === true;
+        }).length;
+
+        // Vínculo turístico: P3 !== 'no'
+        const conVinculo = res.filter((r) => {
+          const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
+          const ans = (raw as any[]) ?? [];
+          const v2 = getA(ans, qId('P3.'));
+          return v2 && v2 !== 'no';
+        }).length;
+
+        // Adaptan comportamiento: P8 !== 'no'
+        const adaptanComp = res.filter((r) => {
+          const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
+          const ans = (raw as any[]) ?? [];
+          const c2 = getA(ans, qId('P8.'));
+          return c2 && c2 !== 'no';
+        }).length;
+
         return {
           total: res.length,
+          centroHistorico,
+          conVinculo,
+          adaptanComp,
           genero: relabel(genero, { hombre: "Hombre", mujer: "Mujer", otro: "Otro" }),
           edad: relabel(edad, EDAD_LABELS),
           vinculo: relabel(vinculo, VINCULO_LABELS),

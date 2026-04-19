@@ -579,15 +579,15 @@ function TabResidentes({ dateFrom, dateTo }: { dateFrom: string; dateTo: string 
           <p className="text-xs text-muted-foreground mt-1">Total residentes</p>
         </Card>
         <Card className="border-0 shadow-sm text-center p-4">
-          <p className="text-3xl font-bold text-teal-600">{d.territorio.find((t) => t.name === "Centro histórico")?.value ?? 0}</p>
+          <p className="text-3xl font-bold text-teal-600">{(d as any).centroHistorico ?? d.territorio.find((t) => t.name === "Centro histórico")?.value ?? 0}</p>
           <p className="text-xs text-muted-foreground mt-1">Centro histórico</p>
         </Card>
         <Card className="border-0 shadow-sm text-center p-4">
-          <p className="text-3xl font-bold text-amber-600">{d.vinculo.find((v) => v.name !== "No")?.value ?? 0}</p>
+          <p className="text-3xl font-bold text-amber-600">{(d as any).conVinculo ?? d.vinculo.filter((v) => v.name !== "No").reduce((a, b) => a + b.value, 0)}</p>
           <p className="text-xs text-muted-foreground mt-1">Con vínculo turístico</p>
         </Card>
         <Card className="border-0 shadow-sm text-center p-4">
-          <p className="text-3xl font-bold text-danger">{d.comportamiento.filter((c) => c.name !== "No cambia").reduce((a, b) => a + b.value, 0)}</p>
+          <p className="text-3xl font-bold text-danger">{(d as any).adaptanComp ?? d.comportamiento.filter((c) => c.name !== "No cambia").reduce((a, b) => a + b.value, 0)}</p>
           <p className="text-xs text-muted-foreground mt-1">Adaptan comportamiento</p>
         </Card>
       </div>
