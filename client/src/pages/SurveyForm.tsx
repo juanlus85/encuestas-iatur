@@ -493,16 +493,12 @@ export default function SurveyForm() {
     return true;
   };
 
-  // Lógica de salto para encuesta de residentes:
-  // step 1 = P1 (¿Es residente de Sevilla capital?)
-  // step 2 = P1.0 (¿Vive en el centro histórico?)
-  // step 3 = P1.1 (desplegable calles 037 + Otra)
-  // step 4 = P1.2 (campo libre de calle) — solo si P1.1 = "__otra__"
-  // step 5 = P1.3 (¿Trabaja en el centro histórico?)
-  // step 6+ = resto de preguntas
+  // Lógica de salto para encuesta de residentes — basada en texto de pregunta, no en número de step
+  // (funciona en cualquier BD independientemente de cuántas preguntas META haya o si existe P1.0)
   const handleNext = () => {
     if (isResidentes && currentQuestion) {
       const ans = getAnswer(currentQuestion.id);
+      const qText = currentQuestion.text;
 
       // P1: ¿Es residente de Sevilla capital? — No = fin encuesta
       if (currentStep === 1 && ans === "no") {
@@ -510,23 +506,38 @@ export default function SurveyForm() {
         return;
       }
 
-      // P1.0: ¿Vive en el centro histórico? — No = salta a P1.3 (step 5)
-      if (currentStep === 2 && ans === "no") {
-        // Saltar P1.1 y P1.2, ir directamente a P1.3
-        setCurrentStep(5);
+      // P1.0: ¿Vive en el centro histórico? — No = saltar P1.1 y P1.2, ir a P1.3 (o siguiente no-P1.x)
+      if (qText.includes("P1.0") && ans === "no") {
+        const p13idx = questions.findIndex((q) => q.text.includes("P1.3"));
+        if (p13idx >= 0) {
+          setCurrentStep(p13idx + 1);
+        } else {
+          // Sin P1.3: saltar P1.1 y P1.2 (avanzar 3 pasos desde P1.0)
+          setCurrentStep(currentStep + 3);
+        }
         return;
       }
 
-      // P1.1: desplegable calles 037 — si elige calle 037 = salta a P1.3 (step 5)
-      if (currentStep === 3) {
+      // P1.1: desplegable calles 037
+      if (qText.includes("P1.1")) {
         if (ans && ans !== "__otra__" && NOMBRES_BARRIO_TURISTICO.includes(ans as string)) {
-          // Calle del 037 seleccionada → saltar P1.2, ir a P1.3
-          setCurrentStep(5);
+          // Calle del 037 → saltar P1.2, ir a P1.3 (o siguiente no-P1.x)
+          const p13idx = questions.findIndex((q) => q.text.includes("P1.3"));
+          if (p13idx >= 0) {
+            setCurrentStep(p13idx + 1);
+          } else {
+            setCurrentStep(currentStep + 2); // salta P1.2
+          }
           return;
         }
-        // Si elige "Otra" → ir a P1.2 (step 4)
+        // Si elige "Otra" → ir a P1.2
         if (ans === "__otra__") {
-          setCurrentStep(4);
+          const p12idx = questions.findIndex((q) => q.text.includes("P1.2"));
+          if (p12idx >= 0) {
+            setCurrentStep(p12idx + 1);
+          } else {
+            setCurrentStep(currentStep + 1);
+          }
           return;
         }
       }
