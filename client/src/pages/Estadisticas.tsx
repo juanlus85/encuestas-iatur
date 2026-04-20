@@ -138,11 +138,19 @@ function TabGeneral({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) 
 
   const timeSlotLabels: Record<string, string> = {
     manana: "Mañana", tarde: "Tarde", noche: "Noche", fin_semana: "Fin semana",
+    mediodia: "Mediodía", mañana: "Mañana", Mañana: "Mañana", Tarde: "Tarde", Noche: "Noche",
   };
-  const timeSlotData = (byTimeSlot as any[]).map((t) => ({
-    name: timeSlotLabels[t.timeSlot] ?? t.timeSlot ?? "—",
-    value: Number(t.count ?? 0),
-  }));
+  const timeSlotOrder = ["manana", "mediodia", "tarde", "noche", "fin_semana"];
+  const timeSlotData = [...(byTimeSlot as any[])]
+    .sort((a, b) => {
+      const ia = timeSlotOrder.indexOf(a.timeSlot ?? "");
+      const ib = timeSlotOrder.indexOf(b.timeSlot ?? "");
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    })
+    .map((t) => ({
+      name: timeSlotLabels[t.timeSlot] ?? t.timeSlot ?? "—",
+      value: Number(t.total ?? t.count ?? 0),
+    }));
 
   const rejTotal = Number((rejStats as any)?.total ?? 0);
   const rejResidentes = Number((rejStats as any)?.byType?.residentes ?? 0);
