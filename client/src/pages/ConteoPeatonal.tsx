@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Users, ChevronLeft, Plus, CheckCircle2, ArrowRight, ArrowLeftRight, Play, Square, Timer } from "lucide-react";
+import { Users, ChevronLeft, Plus, ArrowRight, ArrowLeftRight, Play, Square, Timer } from "lucide-react";
 import { Link } from "wouter";
 import { SURVEY_POINTS, getFlowsForPoint, type SurveyPoint, type SurveySubPoint } from "../../../shared/surveyPoints";
 
@@ -29,9 +29,10 @@ export default function ConteoPeatonal() {
   const [selectedPoint, setSelectedPoint] = useState<SurveyPoint | null>(null);
   const [selectedSubPoint, setSelectedSubPoint] = useState<SurveySubPoint | null>(null);
 
-  // Conteo
-  const [selectedCount, setSelectedCount] = useState<number | null>(null);
+  // Flujo seleccionado (persiste entre registros)
   const [selectedFlow, setSelectedFlow] = useState<{ label: string; from: string; to: string; fromCode: string; toCode: string } | null>(null);
+
+  // Dialog grupo grande
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupCount, setGroupCount] = useState("");
   const groupInputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +48,10 @@ export default function ConteoPeatonal() {
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [sessionStartedAt, setSessionStartedAt] = useState<Date | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [sessionTotal, setSessionTotal] = useState(0); // total de personas en esta sesión
+  const [sessionTotal, setSessionTotal] = useState(0);
+
+  // Feedback visual al registrar (parpadeo del botón pulsado)
+  const [lastPressed, setLastPressed] = useState<number | null>(null);
 
   // Scroll al inicio al cambiar de paso
   useEffect(() => {
@@ -101,38 +105,43 @@ export default function ConteoPeatonal() {
   });
 
   const addPass = trpc.passes.add.useMutation({
-    onSuccess: () => {
-      if (selectedCount !== null && selectedFlow) {
-        const newPass = {
-          count: selectedCount,
-          direction: selectedFlow.label,
-          time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-        };
-        setRecentPasses((prev) => [newPass, ...prev.slice(0, 9)]);
-        setTotalToday((prev) => prev + selectedCount);
-        setSessionTotal((prev) => prev + selectedCount);
-        toast.success(`+${selectedCount} persona${selectedCount !== 1 ? "s" : ""} · ${selectedFlow.label}`, { duration: 1500 });
-        setSelectedCount(null);
-        setSelectedFlow(null);
-      }
+    onSuccess: (_data, variables) => {
+      const count = variables.count;
+      const direction = variables.directionLabel ?? "";
+      const newPass = {
+        count,
+        direction,
+        time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      };
+      setRecentPasses((prev) => [newPass, ...prev.slice(0, 9)]);
+      setTotalToday((prev) => prev + count);
+      setSessionTotal((prev) => prev + count);
+      toast.success(`+${count} persona${count !== 1 ? "s" : ""} · ${direction}`, { duration: 1200 });
+      // Limpiar feedback visual
+      setTimeout(() => setLastPressed(null), 300);
     },
-    onError: (err) => toast.error("Error al guardar: " + err.message),
+    onError: (err) => {
+      toast.error("Error al guardar: " + err.message);
+      setLastPressed(null);
+    },
   });
 
-  // ─── Handlers ───────────────────────────────────────────────────────────────
+  // ─── Registrar directamente al pulsar un botón de número ────────────────────
 
-  const handleAddPass = () => {
-    if (!selectedCount || !selectedFlow || !selectedPoint) {
-      toast.error("Selecciona el número de personas y el flujo");
+  const handleQuickAdd = (count: number) => {
+    if (!selectedFlow) {
+      toast.error("Selecciona primero un flujo (sentido)", { duration: 2000 });
       return;
     }
+    if (!selectedPoint) return;
+    setLastPressed(count);
     addPass.mutate({
       surveyPoint: selectedPoint.fullName,
       surveyPointCode: selectedPoint.code,
       directionLabel: selectedFlow.label,
       flowOrigin: selectedFlow.fromCode,
       flowDestination: selectedFlow.toCode,
-      count: selectedCount,
+      count,
       latitude: gps?.lat,
       longitude: gps?.lng,
       gpsAccuracy: gps?.acc,
@@ -143,9 +152,9 @@ export default function ConteoPeatonal() {
   const handleGroupConfirm = () => {
     const n = parseInt(groupCount, 10);
     if (!isNaN(n) && n > 0) {
-      setSelectedCount(n);
       setGroupDialogOpen(false);
       setGroupCount("");
+      handleQuickAdd(n);
     }
   };
 
@@ -170,23 +179,16 @@ export default function ConteoPeatonal() {
   const handleBackToSubpunto = () => {
     setStep("subpunto");
     setSelectedSubPoint(null);
-    setSelectedCount(null);
     setSelectedFlow(null);
-    // Si hay sesión activa, la finalizamos
-    if (sessionId) {
-      finishSession.mutate({ id: sessionId, totalPersons: sessionTotal });
-    }
+    if (sessionId) finishSession.mutate({ id: sessionId, totalPersons: sessionTotal });
   };
 
   const handleBackToPunto = () => {
     setStep("punto");
     setSelectedPoint(null);
     setSelectedSubPoint(null);
-    setSelectedCount(null);
     setSelectedFlow(null);
-    if (sessionId) {
-      finishSession.mutate({ id: sessionId, totalPersons: sessionTotal });
-    }
+    if (sessionId) finishSession.mutate({ id: sessionId, totalPersons: sessionTotal });
   };
 
   // ─── PASO 1: Selección de punto principal ────────────────────────────────────
@@ -285,173 +287,194 @@ export default function ConteoPeatonal() {
 
   // ─── PASO 3: Pantalla de conteo ──────────────────────────────────────────────
 
-  // Flujos filtrados: solo los que involucran el subpunto seleccionado
   const allFlows = selectedPoint ? getFlowsForPoint(selectedPoint) : [];
   const flows = selectedSubPoint
     ? allFlows.filter((f) => f.fromCode === selectedSubPoint.code || f.toCode === selectedSubPoint.code)
     : allFlows;
 
-  const canAdd = selectedCount !== null && selectedFlow !== null;
   const sessionActive = sessionId !== null && sessionStartedAt !== null;
+  const isAdding = addPass.isPending;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="shrink-0" onClick={handleBackToSubpunto}>
+
+      {/* ─── Header compacto ─── */}
+      <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex items-center gap-3 sticky top-0 z-10">
+        <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9" onClick={handleBackToSubpunto}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-semibold text-gray-900 truncate">
+          <div className="text-sm font-semibold text-gray-900 truncate leading-tight">
             {selectedPoint?.code} {selectedPoint?.name}
             {selectedSubPoint && <span className="text-gray-500 font-normal"> · {selectedSubPoint.name}</span>}
-          </h1>
-          <p className="text-xs text-gray-500">
+          </div>
+          <div className="text-xs text-gray-400 leading-tight">
             {gps ? `GPS ±${Math.round(gps.acc)}m` : "Obteniendo GPS..."}
-          </p>
+          </div>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-2xl font-bold text-blue-700">{totalToday}</div>
-          <div className="text-xs text-gray-500">hoy</div>
+        {/* Totales */}
+        <div className="flex items-center gap-3 shrink-0">
+          {sessionActive && (
+            <div className="text-center">
+              <div className="text-base font-bold text-green-700 leading-tight">{sessionTotal}</div>
+              <div className="text-xs text-gray-400 leading-tight">sesión</div>
+            </div>
+          )}
+          <div className="text-center">
+            <div className="text-base font-bold text-blue-700 leading-tight">{totalToday}</div>
+            <div className="text-xs text-gray-400 leading-tight">hoy</div>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 p-4 max-w-lg mx-auto w-full space-y-5">
+      <div className="flex-1 flex flex-col max-w-lg mx-auto w-full">
 
-        {/* ─── Barra de sesión cronometrada ─── */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3">
+        {/* ─── Barra de sesión ─── */}
+        <div className="bg-white border-b border-gray-100 px-4 py-2">
           <div className="grid grid-cols-3 gap-2 items-center">
-            {/* Botón Iniciar */}
             <Button
               onClick={handleStartSession}
               disabled={sessionActive || startSession.isPending}
-              className="h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-40"
+              size="sm"
+              className="h-10 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-40 text-xs"
             >
-              <Play className="h-4 w-4 mr-1.5" />
+              <Play className="h-3.5 w-3.5 mr-1" />
               Iniciar
             </Button>
-
-            {/* Temporizador central */}
             <div className="flex flex-col items-center justify-center">
-              <div className={`flex items-center gap-1.5 ${sessionActive ? "text-blue-700" : "text-gray-400"}`}>
-                <Timer className="h-4 w-4" />
-                <span className="text-xl font-mono font-bold tabular-nums">
-                  {formatElapsed(elapsed)}
-                </span>
+              <div className={`flex items-center gap-1 ${sessionActive ? "text-blue-700" : "text-gray-400"}`}>
+                <Timer className="h-3.5 w-3.5" />
+                <span className="text-lg font-mono font-bold tabular-nums">{formatElapsed(elapsed)}</span>
               </div>
-              {sessionActive && (
-                <span className="text-xs text-green-600 font-medium mt-0.5">{sessionTotal} personas</span>
-              )}
-              {!sessionActive && (
-                <span className="text-xs text-gray-400 mt-0.5">sin sesión</span>
-              )}
+              {!sessionActive && <span className="text-xs text-gray-400">sin sesión</span>}
             </div>
-
-            {/* Botón Finalizar */}
             <Button
               onClick={handleFinishSession}
               disabled={!sessionActive || finishSession.isPending}
-              className="h-12 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-40"
+              size="sm"
+              className="h-10 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-40 text-xs"
             >
-              <Square className="h-4 w-4 mr-1.5" />
+              <Square className="h-3.5 w-3.5 mr-1" />
               Finalizar
             </Button>
           </div>
         </div>
 
-        {/* ─── Personas ─── */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4" /> Personas
-          </h2>
-          <div className="grid grid-cols-4 gap-2 mb-2">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-              <button
-                key={n}
-                onClick={() => setSelectedCount(n)}
-                className={`h-16 rounded-xl text-2xl font-bold transition-all duration-100 border-2 ${
-                  selectedCount === n
-                    ? "bg-blue-700 border-blue-700 text-white shadow-md scale-105"
-                    : "bg-white border-gray-200 text-gray-800 hover:border-blue-400 hover:bg-blue-50"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => {
-              setGroupDialogOpen(true);
-              setTimeout(() => groupInputRef.current?.focus(), 100);
-            }}
-            className={`w-full h-14 rounded-xl border-2 flex items-center justify-center gap-2 font-semibold text-base transition-all duration-100 ${
-              selectedCount !== null && selectedCount > 8
-                ? "bg-amber-500 border-amber-500 text-white shadow-md"
-                : "bg-white border-dashed border-gray-300 text-gray-600 hover:border-amber-400 hover:bg-amber-50"
-            }`}
-          >
-            <Plus className="h-5 w-5" />
-            {selectedCount !== null && selectedCount > 8 ? `Grupo: ${selectedCount} personas` : "Grupo grande (9+)"}
-          </button>
-        </div>
+        <div className="flex-1 flex flex-col px-4 pt-4 pb-4 gap-4">
 
-        {/* ─── Flujos (solo los del subpunto seleccionado) ─── */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-2">
-            <ArrowLeftRight className="h-4 w-4" /> Flujo (sentido)
-          </h2>
-          <div className="space-y-2">
-            {flows.map((flow) => (
-              <button
-                key={flow.label}
-                onClick={() => setSelectedFlow(flow)}
-                className={`w-full text-left px-4 py-3.5 rounded-xl border-2 font-medium text-sm transition-all duration-100 ${
-                  selectedFlow?.label === flow.label
-                    ? "bg-blue-700 border-blue-700 text-white shadow-md"
-                    : "bg-white border-gray-200 text-gray-800 hover:border-blue-400 hover:bg-blue-50"
-                }`}
-              >
-                {flow.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ─── Botón Añadir ─── */}
-        <Button
-          onClick={handleAddPass}
-          disabled={!canAdd || addPass.isPending}
-          className={`w-full h-16 text-lg font-bold rounded-xl transition-all duration-150 ${
-            canAdd
-              ? "bg-green-600 hover:bg-green-700 text-white shadow-lg"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-          }`}
-        >
-          {addPass.isPending ? "Guardando..." : canAdd ? (
-            <><CheckCircle2 className="h-6 w-6 mr-2" />Añadir · {selectedCount} persona{selectedCount !== 1 ? "s" : ""} · {selectedFlow?.label}</>
-          ) : "Selecciona personas y flujo"}
-        </Button>
-
-        {/* ─── Últimos registros ─── */}
-        {recentPasses.length > 0 && (
+          {/* ─── Flujos (sentido) — selección persistente ─── */}
           <div>
-            <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Últimos registros</h2>
-            <div className="space-y-1.5">
-              {recentPasses.map((p, i) => (
-                <div key={i} className="bg-white border border-gray-100 rounded-lg px-4 py-2.5 flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-bold text-blue-700 text-base shrink-0">{p.count}</span>
-                    <span className="text-gray-700 truncate">{p.direction}</span>
-                  </div>
-                  <span className="text-gray-400 text-xs shrink-0 ml-2">{p.time}</span>
-                </div>
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              Flujo (sentido)
+              {!selectedFlow && <span className="text-amber-500 font-bold ml-1">← selecciona uno</span>}
+            </h2>
+            <div className="space-y-2">
+              {flows.map((flow) => (
+                <button
+                  key={flow.label}
+                  onClick={() => setSelectedFlow(flow)}
+                  className={`w-full text-left px-4 py-3.5 rounded-xl border-2 font-medium text-sm transition-all duration-100 ${
+                    selectedFlow?.label === flow.label
+                      ? "bg-blue-700 border-blue-700 text-white shadow-md"
+                      : "bg-white border-gray-200 text-gray-800 hover:border-blue-400 hover:bg-blue-50"
+                  }`}
+                >
+                  {flow.label}
+                </button>
               ))}
             </div>
           </div>
-        )}
+
+          {/* ─── Botones de personas — registran directamente ─── */}
+          <div>
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5" />
+              Personas — toca para registrar
+            </h2>
+
+            {/* Grid +1..+8 */}
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => {
+                const isActive = lastPressed === n && isAdding;
+                return (
+                  <button
+                    key={n}
+                    onClick={() => handleQuickAdd(n)}
+                    disabled={isAdding}
+                    className={`h-16 rounded-xl text-2xl font-bold transition-all duration-100 border-2 select-none
+                      ${isActive
+                        ? "bg-green-600 border-green-600 text-white scale-95 shadow-inner"
+                        : selectedFlow
+                          ? "bg-white border-gray-200 text-gray-800 hover:border-blue-500 hover:bg-blue-50 active:scale-95 active:bg-blue-100"
+                          : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                      }`}
+                  >
+                    +{n}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Grupo grande */}
+            <button
+              onClick={() => {
+                if (!selectedFlow) {
+                  toast.error("Selecciona primero un flujo (sentido)", { duration: 2000 });
+                  return;
+                }
+                setGroupDialogOpen(true);
+                setTimeout(() => groupInputRef.current?.focus(), 100);
+              }}
+              disabled={isAdding}
+              className={`w-full h-14 rounded-xl border-2 flex items-center justify-center gap-2 font-semibold text-base transition-all duration-100
+                ${selectedFlow
+                  ? "bg-white border-dashed border-amber-400 text-amber-700 hover:bg-amber-50 active:scale-95"
+                  : "bg-gray-100 border-dashed border-gray-300 text-gray-400 cursor-not-allowed"
+                }`}
+            >
+              <Plus className="h-5 w-5" />
+              Grupo grande (9+)
+            </button>
+          </div>
+
+          {/* ─── Flujo activo + último registro ─── */}
+          {selectedFlow && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between">
+              <div className="text-sm text-blue-800">
+                <span className="font-semibold">Flujo activo:</span> {selectedFlow.label}
+              </div>
+              <button
+                onClick={() => setSelectedFlow(null)}
+                className="text-xs text-blue-500 hover:text-blue-700 underline ml-2 shrink-0"
+              >
+                cambiar
+              </button>
+            </div>
+          )}
+
+          {/* ─── Últimos registros ─── */}
+          {recentPasses.length > 0 && (
+            <div>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Últimos registros</h2>
+              <div className="space-y-1.5">
+                {recentPasses.map((p, i) => (
+                  <div key={i} className="bg-white border border-gray-100 rounded-lg px-4 py-2.5 flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-bold text-blue-700 text-base shrink-0">+{p.count}</span>
+                      <span className="text-gray-700 truncate">{p.direction}</span>
+                    </div>
+                    <span className="text-gray-400 text-xs shrink-0 ml-2">{p.time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
 
-      {/* Dialog grupo grande */}
+      {/* ─── Dialog grupo grande ─── */}
       <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Grupo grande</DialogTitle></DialogHeader>
@@ -474,7 +497,7 @@ export default function ConteoPeatonal() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setGroupDialogOpen(false); setGroupCount(""); }}>Cancelar</Button>
-            <Button onClick={handleGroupConfirm} disabled={!groupCount || parseInt(groupCount) < 1}>Confirmar</Button>
+            <Button onClick={handleGroupConfirm} disabled={!groupCount || parseInt(groupCount) < 1}>Registrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
