@@ -913,19 +913,19 @@ export const appRouter = router({
           const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
           const ans = (raw as any[]) ?? [];
           // Usar columnas r_p directamente (más fiables que el JSON answers)
-          // Género: r_p08 ("1"=hombre, "2"=mujer, "3"=otro)
-          const gCode = rAny.r_p08 ?? getA(ans, qId('P4.'));
-          const gVal = gCode === "1" ? "hombre" : gCode === "2" ? "mujer" : gCode === "3" ? "otro" : (gCode ?? null);
+          // Género: r_p05 = P4 Género ("1"=hombre, "2"=mujer, "3"=otro)
+          const gCode = rAny.r_p05 ?? getA(ans, qId('P4.'));
+          const gVal = gCode === "1" ? "hombre" : gCode === "2" ? "mujer" : gCode === "3" ? "otro" : (typeof gCode === 'string' && ['hombre','mujer','otro'].includes(gCode.toLowerCase()) ? gCode.toLowerCase() : null);
           if (gVal) genero.push(gVal);
-          // Edad: r_p09 ("18_29", "30_44", "45_64", "65_75", "76_mas")
-          const eVal = rAny.r_p09 ?? getA(ans, qId('P5.'));
+          // Edad: r_p06 = P5 Edad ("18_29", "30_44", "45_64", "65_75", "76_mas")
+          const eVal = rAny.r_p06 ?? getA(ans, qId('P5.'));
           if (eVal) edad.push(eVal);
-          // Vínculo: r_p07 ("1"=sí_yo, "2"=sí_otro, "3"=no) o del JSON
-          const vCode = rAny.r_p07 ?? getA(ans, qId('P3.'));
-          const vVal = vCode === "1" ? "si_yo" : vCode === "2" ? "si_otro" : vCode === "3" ? "no" : (vCode ?? null);
+          // Vínculo: r_p03 = P1.2 ¿Trabaja en centro histórico? ("1"=sí, "2"=no) o del JSON
+          const vCode = rAny.r_p03 ?? getA(ans, qId('P3.'));
+          const vVal = vCode === "1" || vCode === "si" || vCode === "si_yo" ? "si_yo" : vCode === "2" || vCode === "no" ? "no" : (vCode ?? null);
           if (vVal) vinculo.push(vVal);
-          // Territorio: r_p02 ("1"=centro histórico, "2"=resto Sevilla)
-          const tcCode = rAny.r_p02 ?? getA(ans, qId('P1.0.'));
+          // Territorio: r_p01 = P1 ¿Vive en centro histórico? ("1"=sí, "2"=no)
+          const tcCode = rAny.r_p01 ?? getA(ans, qId('P1.0.'));
           if (tcCode) territorio.push(tcCode === "1" || tcCode === "si" ? "Centro histórico" : "Resto Sevilla");
 
           // Satisfacción P6.01..P6.15
