@@ -69,44 +69,51 @@ const V_LABELS: [string, string][] = [
 ];
 
 const R_LABELS: [string, string][] = [
-  ["r_p01", "R_P01 · P1 ¿Reside habitualmente en este barrio?"],
-  ["r_p02", "R_P02 · P1.1 ¿En qué calle?"],
-  ["r_p03", "R_P03 · P2 Años viviendo en el barrio"],
-  ["r_p04", "R_P04 · P3 ¿Percibe beneficios económicos del turismo?"],
-  ["r_p05", "R_P05 · P4 Género"],
-  ["r_p06", "R_P06 · P5 Edad"],
-  ["r_p07", "R_P07 · P6.01 Turismo mejora economía local (1-5)"],
-  ["r_p08", "R_P08 · P6.02 Turismo genera congestión (1-5)"],
-  ["r_p09", "R_P09 · P6.03 Turismo atrae inversores (1-5)"],
-  ["r_p10", "R_P10 · P6.04 Turismo encarece viviendas (1-5)"],
-  ["r_p11", "R_P11 · P6.05 Turismo aumenta calidad de vida (1-5)"],
-  ["r_p12", "R_P12 · P6.06 Turismo provoca desplazamientos (1-5)"],
-  ["r_p13", "R_P13 · P6.07 Turismo mejora imagen ciudad (1-5)"],
-  ["r_p14", "R_P14 · P6.08 Turismo pérdida de identidad (1-5)"],
-  ["r_p15", "R_P15 · P6.09 Turismo conserva monumentos (1-5)"],
-  ["r_p16", "R_P16 · P6.10 Turismo trae tráfico y falta de aparcamiento (1-5)"],
-  ["r_p17", "R_P17 · P6.11 Turismo incrementa opciones de ocio (1-5)"],
-  ["r_p18", "R_P18 · P6.12 Turismo mejora servicios limpieza/seguridad (1-5)"],
-  ["r_p19", "R_P19 · P6.13 Turismo consume recursos agua/energía (1-5)"],
-  ["r_p20", "R_P20 · P6.14 Turismo aumenta contaminación/suciedad (1-5)"],
-  ["r_p21", "R_P21 · P6.15 Turismo crea sociedad tolerante/multicultural (1-5)"],
-  ["r_p22", "R_P22 · P7a Frecuencia: comercios o servicios de proximidad"],
-  ["r_p23", "R_P23 · P7b Frecuencia: acompañamiento escolar o familiar"],
-  ["r_p24", "R_P24 · P7c Frecuencia: ocio o actividades comunitarias"],
-  ["r_p25", "R_P25 · P7d Frecuencia: trayectos al trabajo"],
-  ["r_p26", "R_P26 · P7e Frecuencia: uso de transporte público"],
-  ["r_p27", "R_P27 · P7f Frecuencia: circulación a pie o en bicicleta"],
-  ["r_p28", "R_P28 · P8 ¿Ha modificado comportamiento por turistas?"],
-  ["r_p29", "R_P29 · P9 Situaciones experimentadas último mes (múltiple)"],
-  ["r_p30", "R_P30 · P10 Presencia turística cambia uso espacio público (1-5)"],
-  ["r_p31", "R_P31 · P11 ¿Cómo le afecta personalmente el turismo? (1-5)"],
-  ["r_p32", "R_P32 · P12 ¿Cómo afecta el turismo a su comunidad? (1-5)"],
-  ["r_p33", "R_P33 · P13 Medidas prioritarias (múltiple, hasta 3)"],
-  ["r_p34", "R_P34 · P14 Observaciones finales"],
-  ["r_p35a", "R_P35a · P13 Medida prioritaria 1"],
-  ["r_p35b", "R_P35b · P13 Medida prioritaria 2"],
-  ["r_p35c", "R_P35c · P13 Medida prioritaria 3"],
+  // ── Perfil del residente ──────────────────────────────────────────────────
+  ["r_p01", "R_P01 · P1 ¿Es residente de Sevilla capital? (1=Sí, 2=No)"],
+  ["r_p02", "R_P02 · P1.0 ¿Vive en el centro histórico? (1=Sí, 2=No)"],
+  ["r_p03", "R_P03 · P1.1 Calle del centro histórico (listado)"],
+  ["r_p04", "R_P04 · P1.2 Calle (campo libre)"],
+  ["r_p05", "R_P05 · P1.3 ¿Trabaja en el centro histórico? (1=Sí, 2=No)"],
+  ["r_p06", "R_P06 · P2 Años viviendo en Sevilla"],
+  ["r_p07", "R_P07 · P3 ¿Percibe beneficios económicos del turismo?"],
+  ["r_p08", "R_P08 · P4 Género (1=Hombre, 2=Mujer, 3=Otro)"],
+  ["r_p09", "R_P09 · P5 Edad"],
+  // ── Efectos del turismo (Likert 1-5) ─────────────────────────────────────
+  ["r_p10", "R_P10 · P6.01 Turismo mejora economía local (1-5)"],
+  ["r_p11", "R_P11 · P6.02 Turismo genera congestión (1-5)"],
+  ["r_p12", "R_P12 · P6.03 Turismo atrae inversores (1-5)"],
+  ["r_p13", "R_P13 · P6.04 Turismo encarece viviendas (1-5)"],
+  ["r_p14", "R_P14 · P6.05 Turismo aumenta calidad de vida (1-5)"],
+  ["r_p15", "R_P15 · P6.06 Turismo provoca desplazamientos (1-5)"],
+  ["r_p16", "R_P16 · P6.07 Turismo mejora imagen ciudad (1-5)"],
+  ["r_p17", "R_P17 · P6.08 Turismo pérdida de identidad (1-5)"],
+  ["r_p18", "R_P18 · P6.09 Turismo conserva monumentos (1-5)"],
+  ["r_p19", "R_P19 · P6.10 Turismo trae tráfico y falta de aparcamiento (1-5)"],
+  ["r_p20", "R_P20 · P6.11 Turismo incrementa opciones de ocio (1-5)"],
+  ["r_p21", "R_P21 · P6.12 Turismo mejora servicios limpieza/seguridad (1-5)"],
+  ["r_p22", "R_P22 · P6.13 Turismo consume recursos agua/energía (1-5)"],
+  ["r_p23", "R_P23 · P6.14 Turismo aumenta contaminación/suciedad (1-5)"],
+  ["r_p24", "R_P24 · P6.15 Turismo crea sociedad tolerante/multicultural (1-5)"],
+  // ── Usos y movilidad ─────────────────────────────────────────────────────
+  ["r_p25", "R_P25 · P7a Frecuencia: comercios o servicios de proximidad"],
+  ["r_p26", "R_P26 · P7b Frecuencia: acompañamiento escolar o familiar"],
+  ["r_p27", "R_P27 · P7c Frecuencia: ocio o actividades comunitarias"],
+  ["r_p28", "R_P28 · P7d Frecuencia: trayectos al trabajo"],
+  ["r_p29", "R_P29 · P7e Frecuencia: uso de transporte público"],
+  ["r_p30", "R_P30 · P7f Frecuencia: circulación a pie o en bicicleta"],
+  ["r_p31", "R_P31 · P8 ¿Ha modificado comportamiento por turistas?"],
+  // ── Convivencia y valoración ─────────────────────────────────────────────
+  ["r_p32", "R_P32 · P9 Situaciones experimentadas último mes (múltiple, JSON)"],
+  ["r_p33", "R_P33 · P10 Presencia turística cambia uso espacio público (1-5)"],
+  ["r_p34", "R_P34 · P11 ¿Cómo le afecta personalmente el turismo? (1-5)"],
+  ["r_p35", "R_P35 · P12 ¿Cómo afecta el turismo a su comunidad? (1-5)"],
+  ["r_p35a", "R_P35a · P13 Medida prioritaria 1ª opción"],
+  ["r_p35b", "R_P35b · P13 Medida prioritaria 2ª opción"],
+  ["r_p35c", "R_P35c · P13 Medida prioritaria 3ª opción"],
   ["r_p36", "R_P36 · (reservado)"],
+  ["r_p37", "R_P37 · P14 Comentario final"],
+  ["SECCION037", "SECCION037 · Zona residencia (1=Centro histórico, 2=Resto Sevilla)"],
 ];
 
 const CONTEO_FIELDS: FieldDef[] = [
@@ -281,7 +288,8 @@ function ExportEncuestasSection() {
       };
       V_LABELS.forEach(([k]) => { csvHeaderMap[`V_P${k.slice(-2).toUpperCase()}`] = k; });
       R_LABELS.forEach(([k]) => {
-        const upper = k.replace("r_p", "R_P").replace("a", "a").replace("b", "b").replace("c", "c");
+        // Mapeo directo: r_p01→R_P01, r_p35a→R_P35a, SECCION037→SECCION037
+        const upper = k.startsWith("r_p") ? k.replace(/^r_p/, "R_P") : k;
         csvHeaderMap[upper] = k;
       });
 
@@ -412,7 +420,7 @@ function ExportEncuestasSection() {
             onChange={toggleField}
           />
           <FieldCheckboxGroup
-            title="Preguntas Residentes (R_P01 – R_P36)"
+            title="Preguntas Residentes (R_P01 – R_P37 + SECCION037)"
             fields={R_LABELS.map(([k, l]) => ({ key: k, label: l }))}
             selected={selectedFields}
             onChange={toggleField}

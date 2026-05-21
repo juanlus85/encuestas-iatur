@@ -908,18 +908,25 @@ export const appRouter = router({
           ['P10.', 'Cambio uso espacio'], ['P11.', 'Impacto personal'], ['P12.', 'Impacto comunidad'],
         ];
 
-        for (const r of res) {
+         for (const r of res) {
+          const rAny = r as any;
           const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
           const ans = (raw as any[]) ?? [];
-
-          const g = getA(ans, qId('P4.'));
-          if (g) genero.push(g);
-          const e = getA(ans, qId('P5.'));
-          if (e) edad.push(e);
-          const v = getA(ans, qId('P3.'));
-          if (v) vinculo.push(v);
-          const tc = getA(ans, qId('P1.0.'));
-          if (tc) territorio.push(tc === "si" || tc === "1" ? "Centro histórico" : "Resto Sevilla");
+          // Usar columnas r_p directamente (más fiables que el JSON answers)
+          // Género: r_p08 ("1"=hombre, "2"=mujer, "3"=otro)
+          const gCode = rAny.r_p08 ?? getA(ans, qId('P4.'));
+          const gVal = gCode === "1" ? "hombre" : gCode === "2" ? "mujer" : gCode === "3" ? "otro" : (gCode ?? null);
+          if (gVal) genero.push(gVal);
+          // Edad: r_p09 ("18_29", "30_44", "45_64", "65_75", "76_mas")
+          const eVal = rAny.r_p09 ?? getA(ans, qId('P5.'));
+          if (eVal) edad.push(eVal);
+          // Vínculo: r_p07 ("1"=sí_yo, "2"=sí_otro, "3"=no) o del JSON
+          const vCode = rAny.r_p07 ?? getA(ans, qId('P3.'));
+          const vVal = vCode === "1" ? "si_yo" : vCode === "2" ? "si_otro" : vCode === "3" ? "no" : (vCode ?? null);
+          if (vVal) vinculo.push(vVal);
+          // Territorio: r_p02 ("1"=centro histórico, "2"=resto Sevilla)
+          const tcCode = rAny.r_p02 ?? getA(ans, qId('P1.0.'));
+          if (tcCode) territorio.push(tcCode === "1" || tcCode === "si" ? "Centro histórico" : "Resto Sevilla");
 
           // Satisfacción P6.01..P6.15
           for (const [pfx, label] of satisfPrefixes) {
