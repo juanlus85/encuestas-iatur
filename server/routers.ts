@@ -841,52 +841,19 @@ export const appRouter = router({
         const getA = (answers: any[], qId: number) => answers.find((a: any) => a.questionId === qId)?.answer;
         const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : 0;
 
-        // ── Lookup dinámico de questionIds por texto de pregunta ──────────────
-        // Buscar el template de residentes activo y cargar sus preguntas
-        const { getDb } = await import('./db');
-        const { questions: questionsTable, surveyTemplates: templatesTable } = await import('../drizzle/schema');
-        const { eq: eqOp, like } = await import('drizzle-orm');
-        const db = await getDb();
-
-        // Mapa: prefijo de texto → questionId (se rellena dinámicamente)
-        const qMap: Record<string, number> = {};
-        if (db) {
-          // Buscar templateId de residentes
-          const tmplRows = await db.select().from(templatesTable)
-            .where(eqOp(templatesTable.type, 'residentes')).limit(1);
-          if (tmplRows.length > 0) {
-            const tmplId = tmplRows[0].id;
-            const qRows = await db.select().from(questionsTable)
-              .where(eqOp(questionsTable.templateId, tmplId));
-            for (const q of qRows) {
-              const t = q.text ?? '';
-              // Mapear por prefijo de pregunta (P4, P5, P3, P1.0, P2, P6.01..P6.15, P7a..P7f, P8, P9, P10, P11, P12)
-              // Mapear por texto exacto de pregunta (clave = texto completo de la pregunta)
-              // Prefijos con espacio para evitar ambigüedades ("P4. Género", "P5. Edad", etc.)
-              const prefixMap: Record<string, string> = {
-                'P4. ': 'P4.', 'P5. ': 'P5.', 'P3. ': 'P3.',
-                'P1.0. ': 'P1.0.', 'P1.1. ': 'P1.1.', 'P1.2. ': 'P1.2.', 'P1.3. ': 'P1.3.',
-                'P2. ': 'P2.',
-                'P6.01. ': 'P6.01', 'P6.02. ': 'P6.02', 'P6.03. ': 'P6.03',
-                'P6.04. ': 'P6.04', 'P6.05. ': 'P6.05', 'P6.06. ': 'P6.06',
-                'P6.07. ': 'P6.07', 'P6.08. ': 'P6.08', 'P6.09. ': 'P6.09',
-                'P6.10. ': 'P6.10', 'P6.11. ': 'P6.11', 'P6.12. ': 'P6.12',
-                'P6.13. ': 'P6.13', 'P6.14. ': 'P6.14', 'P6.15. ': 'P6.15',
-                'P7a. ': 'P7a.', 'P7b. ': 'P7b.', 'P7c. ': 'P7c.',
-                'P7d. ': 'P7d.', 'P7e. ': 'P7e.', 'P7f. ': 'P7f.',
-                'P8. ': 'P8.', 'P9. ': 'P9.', 'P10. ': 'P10.', 'P11. ': 'P11.', 'P12. ': 'P12.',
-              };
-              for (const [pfxWithSpace, key] of Object.entries(prefixMap)) {
-                if (t.startsWith(pfxWithSpace)) { qMap[key] = q.id; break; }
-              }
-              // P1. ¿Es residente...?
-              if (t.startsWith('P1. ')) qMap['P1.'] = q.id;
-            }
-          }
-        }
-
-        // Helper para obtener qId por prefijo
-        const qId = (pfx: string) => qMap[pfx] ?? -1;
+        // IDs fijos de preguntas de residentes (misma BD que visitantes, IDs definidos en RESIDENTES_QUESTION_IDS)
+        const qId = (key: string): number => ({
+          'viveCentro':    60029,
+          'trabajaCentro': 60030,
+          'vinculo':       60034,
+          'genero':        60035,
+          'edad':          60036,
+          'P6.01': 60037, 'P6.02': 60038, 'P6.03': 60039, 'P6.04': 60040, 'P6.05': 60041,
+          'P6.06': 60042, 'P6.07': 60043, 'P6.08': 60044, 'P6.09': 60045, 'P6.10': 60046,
+          'P6.11': 60047, 'P6.12': 60048, 'P6.13': 60049, 'P6.14': 60050, 'P6.15': 60051,
+          'P7a.': 60052, 'P7b.': 60053, 'P7c.': 60054, 'P7d.': 60055, 'P7e.': 60056, 'P7f.': 60057,
+          'P8.':  60058, 'P9.':  60059, 'P10.': 60060, 'P11.': 60061, 'P12.': 60062,
+        } as Record<string, number>)[key] ?? -1;
 
         const genero: string[] = [];
         const edad: string[] = [];
@@ -920,17 +887,17 @@ export const appRouter = router({
           const rAny = r as any;
           const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
           const ans = (raw as any[]) ?? [];
-          // Género (P4)
-          const g = getA(ans, qId('P4.'));
+          // Género (P4. Género → ID 60035)
+          const g = getA(ans, qId('genero'));
           if (g) genero.push(g);
-          // Edad (P5)
-          const e = getA(ans, qId('P5.'));
+          // Edad (P5. Edad → ID 60036)
+          const e = getA(ans, qId('edad'));
           if (e) edad.push(e);
-          // Vínculo económico con turismo (P3)
-          const v = getA(ans, qId('P3.'));
+          // Vínculo económico con turismo (P3 → ID 60034)
+          const v = getA(ans, qId('vinculo'));
           if (v) vinculo.push(v);
-          // Territorio: P1.0 ¿Vive en centro histórico?
-          const tc = getA(ans, qId('P1.0.'));
+          // Territorio: P1 ¿Vive en centro histórico? (ID 60029)
+          const tc = getA(ans, qId('viveCentro'));
           if (tc) territorio.push(tc === 'si' || tc === '1' ? 'Centro histórico' : 'Resto Sevilla');
 
           // Satisfacción P6.01..P6.15
