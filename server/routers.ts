@@ -861,18 +861,26 @@ export const appRouter = router({
             for (const q of qRows) {
               const t = q.text ?? '';
               // Mapear por prefijo de pregunta (P4, P5, P3, P1.0, P2, P6.01..P6.15, P7a..P7f, P8, P9, P10, P11, P12)
-              const prefixes = [
-                'P4.', 'P5.', 'P3.', 'P1.0.', 'P2.', 'P1.1.', 'P1.2.', 'P1.3.',
-                'P6.01', 'P6.02', 'P6.03', 'P6.04', 'P6.05', 'P6.06', 'P6.07',
-                'P6.08', 'P6.09', 'P6.10', 'P6.11', 'P6.12', 'P6.13', 'P6.14', 'P6.15',
-                'P7a.', 'P7b.', 'P7c.', 'P7d.', 'P7e.', 'P7f.',
-                'P8.', 'P9.', 'P10.', 'P11.', 'P12.',
-              ];
-              for (const pfx of prefixes) {
-                if (t.startsWith(pfx)) { qMap[pfx] = q.id; break; }
+              // Mapear por texto exacto de pregunta (clave = texto completo de la pregunta)
+              // Prefijos con espacio para evitar ambigüedades ("P4. Género", "P5. Edad", etc.)
+              const prefixMap: Record<string, string> = {
+                'P4. ': 'P4.', 'P5. ': 'P5.', 'P3. ': 'P3.',
+                'P1.0. ': 'P1.0.', 'P1.1. ': 'P1.1.', 'P1.2. ': 'P1.2.', 'P1.3. ': 'P1.3.',
+                'P2. ': 'P2.',
+                'P6.01. ': 'P6.01', 'P6.02. ': 'P6.02', 'P6.03. ': 'P6.03',
+                'P6.04. ': 'P6.04', 'P6.05. ': 'P6.05', 'P6.06. ': 'P6.06',
+                'P6.07. ': 'P6.07', 'P6.08. ': 'P6.08', 'P6.09. ': 'P6.09',
+                'P6.10. ': 'P6.10', 'P6.11. ': 'P6.11', 'P6.12. ': 'P6.12',
+                'P6.13. ': 'P6.13', 'P6.14. ': 'P6.14', 'P6.15. ': 'P6.15',
+                'P7a. ': 'P7a.', 'P7b. ': 'P7b.', 'P7c. ': 'P7c.',
+                'P7d. ': 'P7d.', 'P7e. ': 'P7e.', 'P7f. ': 'P7f.',
+                'P8. ': 'P8.', 'P9. ': 'P9.', 'P10. ': 'P10.', 'P11. ': 'P11.', 'P12. ': 'P12.',
+              };
+              for (const [pfxWithSpace, key] of Object.entries(prefixMap)) {
+                if (t.startsWith(pfxWithSpace)) { qMap[key] = q.id; break; }
               }
-              // También mapear P1 sin punto (P1. ¿Es residente...)
-              if (t.startsWith('P1. ') || t.startsWith('P1.¿')) qMap['P1.'] = q.id;
+              // P1. ¿Es residente...?
+              if (t.startsWith('P1. ')) qMap['P1.'] = q.id;
             }
           }
         }
@@ -912,21 +920,18 @@ export const appRouter = router({
           const rAny = r as any;
           const raw = typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers;
           const ans = (raw as any[]) ?? [];
-          // Usar columnas r_p directamente (más fiables que el JSON answers)
-          // Género: r_p05 = P4 Género ("1"=hombre, "2"=mujer, "3"=otro)
-          const gCode = rAny.r_p05 ?? getA(ans, qId('P4.'));
-          const gVal = gCode === "1" ? "hombre" : gCode === "2" ? "mujer" : gCode === "3" ? "otro" : (typeof gCode === 'string' && ['hombre','mujer','otro'].includes(gCode.toLowerCase()) ? gCode.toLowerCase() : null);
-          if (gVal) genero.push(gVal);
-          // Edad: r_p06 = P5 Edad ("18_29", "30_44", "45_64", "65_75", "76_mas")
-          const eVal = rAny.r_p06 ?? getA(ans, qId('P5.'));
-          if (eVal) edad.push(eVal);
-          // Vínculo: r_p03 = P1.2 ¿Trabaja en centro histórico? ("1"=sí, "2"=no) o del JSON
-          const vCode = rAny.r_p03 ?? getA(ans, qId('P3.'));
-          const vVal = vCode === "1" || vCode === "si" || vCode === "si_yo" ? "si_yo" : vCode === "2" || vCode === "no" ? "no" : (vCode ?? null);
-          if (vVal) vinculo.push(vVal);
-          // Territorio: r_p01 = P1 ¿Vive en centro histórico? ("1"=sí, "2"=no)
-          const tcCode = rAny.r_p01 ?? getA(ans, qId('P1.0.'));
-          if (tcCode) territorio.push(tcCode === "1" || tcCode === "si" ? "Centro histórico" : "Resto Sevilla");
+          // Género (P4)
+          const g = getA(ans, qId('P4.'));
+          if (g) genero.push(g);
+          // Edad (P5)
+          const e = getA(ans, qId('P5.'));
+          if (e) edad.push(e);
+          // Vínculo económico con turismo (P3)
+          const v = getA(ans, qId('P3.'));
+          if (v) vinculo.push(v);
+          // Territorio: P1.0 ¿Vive en centro histórico?
+          const tc = getA(ans, qId('P1.0.'));
+          if (tc) territorio.push(tc === 'si' || tc === '1' ? 'Centro histórico' : 'Resto Sevilla');
 
           // Satisfacción P6.01..P6.15
           for (const [pfx, label] of satisfPrefixes) {
