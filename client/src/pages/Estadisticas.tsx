@@ -781,15 +781,15 @@ function TabResidentes({ dateFrom, dateTo }: { dateFrom: string; dateTo: string 
         </Card>
 
         <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Territorio de residencia</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Vínculo turístico</CardTitle></CardHeader>
           <CardContent>
-            {d.territorio.length === 0 ? <EmptyState /> : (
+            {d.vinculo.length === 0 ? <EmptyState /> : (
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
-                  <Pie data={d.territorio} cx="50%" cy="50%" innerRadius={50} outerRadius={80}
+                  <Pie data={d.vinculo} cx="50%" cy="50%" innerRadius={50} outerRadius={80}
                     paddingAngle={3} dataKey="value"
                     label={renderPieLabel} labelLine={false}>
-                    {d.territorio.map((_, i) => <Cell key={i} fill={[C.primary, C.teal][i % 2]} />)}
+                    {d.vinculo.map((_, i) => <Cell key={i} fill={[C.teal, C.primary, C.muted][i % 3]} />)}
                   </Pie>
                   <Tooltip formatter={(v: any, name: any, props: any) => [v, props.payload?.name ?? name]} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
