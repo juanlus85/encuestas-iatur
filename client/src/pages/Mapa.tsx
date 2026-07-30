@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { drawHeatmap } from "@/lib/drawHeatmap";
 import { Loader2, MapPin, Radio, RefreshCw, Thermometer, UserCheck } from "lucide-react";
 import { useState } from "react";
 
@@ -282,13 +281,24 @@ export default function Mapa() {
         marker.addListener("click", () => infoWindow.open(map, marker));
       });
     } else if (mode === "heatmap") {
-      // Usar drawHeatmap (simpleheat) en lugar de HeatmapLayer (eliminado en v3.65)
-      const heatPoints = validLocations.map((loc: any) => ({
-        lat: Number(loc.latitude),
-        lng: Number(loc.longitude),
+      // Usar HeatmapLayer nativo de Google Maps (disponible en v=3.58)
+      const heatData = validLocations.map((loc: any) => ({
+        location: new google.maps.LatLng(Number(loc.latitude), Number(loc.longitude)),
         weight: 1,
       }));
-      drawHeatmap(map, heatPoints, { radius: 18, blur: 12, maxOpacity: 0.72 });
+      new google.maps.visualization.HeatmapLayer({
+        data: heatData,
+        map,
+        radius: 25,
+        opacity: 0.8,
+        gradient: [
+          "rgba(0, 255, 0, 0)",
+          "rgba(0, 255, 0, 1)",
+          "rgba(255, 255, 0, 1)",
+          "rgba(255, 165, 0, 1)",
+          "rgba(255, 0, 0, 1)",
+        ],
+      });
     }
   };
 
