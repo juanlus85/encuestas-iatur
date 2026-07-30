@@ -281,21 +281,24 @@ export default function Mapa() {
         marker.addListener("click", () => infoWindow.open(map, marker));
       });
     } else if (mode === "heatmap") {
-      // Usar HeatmapLayer nativo de Google Maps (disponible en v=3.58)
-      const heatData = validLocations.map((loc: any) => ({
-        location: new google.maps.LatLng(Number(loc.latitude), Number(loc.longitude)),
-        weight: 1,
-      }));
-      new google.maps.visualization.HeatmapLayer({
-        data: heatData,
+      const heatmapData = validLocations.map((loc) =>
+        new google.maps.LatLng(Number(loc.latitude), Number(loc.longitude))
+      );
+      new (google.maps as any).visualization.HeatmapLayer({
+        data: heatmapData,
         map,
         radius: 25,
-        opacity: 0.8,
+        opacity: 0.75,
         gradient: [
           "rgba(0, 255, 0, 0)",
           "rgba(0, 255, 0, 1)",
-          "rgba(255, 255, 0, 1)",
-          "rgba(255, 165, 0, 1)",
+          "rgba(64, 220, 0, 1)",
+          "rgba(128, 200, 0, 1)",
+          "rgba(180, 180, 0, 1)",
+          "rgba(220, 160, 0, 1)",
+          "rgba(255, 140, 0, 1)",
+          "rgba(255, 100, 0, 1)",
+          "rgba(255, 60, 0, 1)",
           "rgba(255, 0, 0, 1)",
         ],
       });

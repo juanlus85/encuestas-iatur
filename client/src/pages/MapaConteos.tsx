@@ -14,21 +14,24 @@ const SURVEY_POINTS = [
   "Mesón del Moro",
 ];
 
-const GOOGLE_MAPS_API_KEY =
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
-  "AIzaSyDMho7U8Eb1RJHc3xKNFEAETvcUBEpCCq8";
+const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
+const FORGE_BASE_URL =
+  import.meta.env.VITE_FRONTEND_FORGE_API_URL || "https://forge.butterfly-effect.dev";
+const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
-// Carga el script de Google Maps con v=3.58 (última versión estable con HeatmapLayer)
+// Carga el script de Google Maps con la librería visualization incluida
 let mapScriptPromise: Promise<void> | null = null;
 function loadMapScript(): Promise<void> {
   if (mapScriptPromise) return mapScriptPromise;
+  // Si ya está cargado, resolver inmediatamente
   if (typeof window !== "undefined" && (window as any).google?.maps?.visualization) {
     return Promise.resolve();
   }
   mapScriptPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=3.58&libraries=marker,places,geocoding,geometry,visualization`;
+    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry,visualization`;
     script.async = true;
+    script.crossOrigin = "anonymous";
     script.onload = () => resolve();
     script.onerror = () => {
       mapScriptPromise = null;
@@ -66,10 +69,7 @@ export default function MapaConteos() {
   const [surveyPoint, setSurveyPoint] = useState("");
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const heatmapLayerRef = useRef<google.maps.visualization.HeatmapLayer | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [mapReady, setMapReady] = useState(false);
 
   const { data: passes = [], isLoading } = trpc.passes.list.useQuery({
     dateFrom: dateFrom || undefined,
@@ -83,14 +83,19 @@ export default function MapaConteos() {
 
   const totalPersonas = validPasses.reduce((sum: number, p: any) => sum + (Number(p.count) ?? 1), 0);
 
-  // Inicializar el mapa una sola vez
+  // Inicializar el mapa y dibujar los datos cuando tengamos tanto el mapa como los datos
   useEffect(() => {
+    if (isLoading) return;
+    if (validPasses.length === 0) return;
     if (!mapContainerRef.current) return;
+
     let cancelled = false;
 
     loadMapScript()
       .then(() => {
         if (cancelled || !mapContainerRef.current) return;
+
+        // Crear o reutilizar el mapa
         if (!mapInstanceRef.current) {
           mapInstanceRef.current = new window.google.maps.Map(mapContainerRef.current, {
             zoom: 17,
@@ -101,91 +106,89 @@ export default function MapaConteos() {
             streetViewControl: false,
             mapId: "DEMO_MAP_ID",
           });
+        } else {
+          // Limpiar capas anteriores recreando el mapa en el mismo contenedor
+          mapInstanceRef.current = new window.google.maps.Map(mapContainerRef.current, {
+            zoom: 17,
+            center: { lat: 37.3861, lng: -5.9915 },
+            mapTypeControl: true,
+            fullscreenControl: true,
+            zoomControl: true,
+            streetViewControl: false,
+            mapId: "DEMO_MAP_ID",
+          });
         }
-        setMapReady(true);
+
+        const map = mapInstanceRef.current;
+
+        if (mode === "heatmap") {
+          const heatmapData = validPasses.map((p: any) => ({
+            location: new window.google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
+            weight: Math.max(1, Number(p.count) ?? 1),
+          }));
+
+          new (window.google.maps as any).visualization.HeatmapLayer({
+            data: heatmapData,
+            map,
+            radius: 35,
+            opacity: 0.8,
+            gradient: [
+              "rgba(0, 255, 0, 0)",
+              "rgba(0, 255, 0, 1)",
+              "rgba(64, 220, 0, 1)",
+              "rgba(128, 200, 0, 1)",
+              "rgba(180, 180, 0, 1)",
+              "rgba(220, 160, 0, 1)",
+              "rgba(255, 140, 0, 1)",
+              "rgba(255, 100, 0, 1)",
+              "rgba(255, 60, 0, 1)",
+              "rgba(255, 0, 0, 1)",
+            ],
+          });
+        } else {
+          // Marcadores con tamaño proporcional al count
+          validPasses.forEach((p: any) => {
+            const scale = Math.max(8, Math.min(24, 8 + Math.sqrt(Number(p.count) ?? 1) * 2));
+            const marker = new window.google.maps.Marker({
+              position: { lat: Number(p.latitude), lng: Number(p.longitude) },
+              map,
+              title: `${p.count} persona(s) · ${p.directionLabel ?? "Sin sentido"}`,
+              icon: {
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale,
+                fillColor: "#f59e0b",
+                fillOpacity: 0.85,
+                strokeColor: "#ffffff",
+                strokeWeight: 2,
+              },
+            });
+
+            const infoWindow = new window.google.maps.InfoWindow({
+              content: `
+                <div style="font-family: Inter, sans-serif; padding: 4px; min-width: 180px;">
+                  <p style="font-weight: 600; margin: 0 0 4px 0; font-size: 13px;">${p.count} persona(s)</p>
+                  <p style="margin: 0; font-size: 12px; color: #666;">Punto: ${p.surveyPoint}</p>
+                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Sentido: ${p.directionLabel ?? "—"}</p>
+                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Encuestador: ${p.encuestadorName ?? "—"}</p>
+                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Fecha: ${new Date(p.recordedAt).toLocaleDateString("es-ES")}</p>
+                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Hora: ${new Date(p.recordedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
+                </div>
+              `,
+            });
+
+            marker.addListener("click", () => infoWindow.open(map, marker));
+          });
+        }
       })
       .catch((err) => {
         if (!cancelled) setMapError("No se pudo cargar el mapa. Comprueba la conexión.");
         console.error(err);
       });
 
-    return () => { cancelled = true; };
-  }, []);
-
-  // Actualizar capas cuando cambian los datos o el modo
-  useEffect(() => {
-    if (!mapReady || !mapInstanceRef.current || isLoading) return;
-
-    const map = mapInstanceRef.current;
-
-    // Limpiar capa de calor anterior
-    if (heatmapLayerRef.current) {
-      heatmapLayerRef.current.setMap(null);
-      heatmapLayerRef.current = null;
-    }
-
-    // Limpiar marcadores anteriores
-    markersRef.current.forEach((m) => m.setMap(null));
-    markersRef.current = [];
-
-    if (validPasses.length === 0) return;
-
-    if (mode === "heatmap") {
-      // Usar HeatmapLayer nativo de Google Maps (disponible en v=3.58)
-      const heatData = validPasses.map((p: any) => ({
-        location: new google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
-        weight: Math.max(1, Number(p.count) ?? 1),
-      }));
-
-      heatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
-        data: heatData,
-        map,
-        radius: 25,
-        opacity: 0.8,
-        gradient: [
-          "rgba(0, 255, 0, 0)",
-          "rgba(0, 255, 0, 1)",
-          "rgba(255, 255, 0, 1)",
-          "rgba(255, 165, 0, 1)",
-          "rgba(255, 0, 0, 1)",
-        ],
-      });
-    } else {
-      // Marcadores con tamaño proporcional al count
-      validPasses.forEach((p: any) => {
-        const scale = Math.max(8, Math.min(24, 8 + Math.sqrt(Number(p.count) ?? 1) * 2));
-        const marker = new window.google.maps.Marker({
-          position: { lat: Number(p.latitude), lng: Number(p.longitude) },
-          map,
-          title: `${p.count} persona(s) · ${p.directionLabel ?? "Sin sentido"}`,
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale,
-            fillColor: "#f59e0b",
-            fillOpacity: 0.85,
-            strokeColor: "#ffffff",
-            strokeWeight: 2,
-          },
-        });
-
-        const infoWindow = new window.google.maps.InfoWindow({
-          content: `
-            <div style="font-family: Inter, sans-serif; padding: 4px; min-width: 180px;">
-              <p style="font-weight: 600; margin: 0 0 4px 0; font-size: 13px;">${p.count} persona(s)</p>
-              <p style="margin: 0; font-size: 12px; color: #666;">Punto: ${p.surveyPoint}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Sentido: ${p.directionLabel ?? "—"}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Encuestador: ${p.encuestadorName ?? "—"}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Fecha: ${new Date(p.recordedAt).toLocaleDateString("es-ES")}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Hora: ${new Date(p.recordedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
-            </div>
-          `,
-        });
-
-        marker.addListener("click", () => infoWindow.open(map, marker));
-        markersRef.current.push(marker);
-      });
-    }
-  }, [mapReady, isLoading, validPasses.length, mode, dateFrom, dateTo, surveyPoint]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, validPasses.length, mode, dateFrom, dateTo, surveyPoint]);
 
   return (
     <DashboardLayout>
@@ -301,6 +304,7 @@ export default function MapaConteos() {
             <div
               ref={mapContainerRef}
               className="w-full h-full"
+              style={{ display: (!isLoading && validPasses.length > 0 && !mapError) ? "block" : "none" }}
             />
           </div>
         </Card>

@@ -1,0 +1,42 @@
+{
+  "build_command": "pnpm run build",
+  "capabilities": [
+    "db",
+    "server",
+    "user"
+  ],
+  "dev_command": "pnpm run dev",
+  "env_vars": {
+    "DATABASE_URL": "mysql://uN1yFnMXg2uz2sS.ecce8a0683a4:ww6q4NNAENmJX843aq3x@gateway02.us-east-1.prod.aws.tidbcloud.com:4000/nHD7C8PRaURA7Ubm8Aop3k?ssl={\"rejectUnauthorized\":true}"
+  },
+  "experiments": null,
+  "git_remote": {
+    "repo_url": "s3://vida-prod-gitrepo/webdev-git/310419663031419078/nHD7C8PRaURA7Ubm8Aop3k",
+    "access_key_id": "ASIAZV3A2ECZHMBW2C37",
+    "secret_access_key": "m3nbr/jGUdmpmEXHw7lllZ7ewRPmGcz4FBVtyujV",
+    "session_token": "IQoJb3JpZ2luX2VjENX//////////wEaCXVzLWVhc3QtMSJHMEUCIEVZFazzj5Ns+4+Ycro9I6o6J2dieiwyheDon5tiDnBPAiEAxT+uUITq1dZVMKnq8whz0314o+jKA7HGeyjSyd9gXkIq/gMInv//////////ARAEGgw2NjUzODYwOTg4NjYiDFLrVAMd9IjpVtUgIyrSA4UJAlxpQ/11GDsSMpUaDNkO08OIkY75XKVLVK+iXeKEOybVPwhy5g+kLTdMOwduwZEkNLV2mCUlyc/3Yd++Th/Ax83M9G+0/xbvr6fwYPnbHXVeZj7DzTKMYhnMtXCLTA0WwlB211kTCellgVvE6ytrp3vqaIB0q816W58BE50nuRkMZeLirXYi1C/Uw6EzZW/dxfpjoA4L+msL92Zf/MO/Xjv5G/UOsyTSQ4sR++U5jIoS9tk6PoDEuek/uiK96RlEZ123zgnMJ5OEztCyTLdAIdWrHpOJSFTMdYPjpvwW4C5HqdOOEInJUUBa/36yefJ4e+TrnukzvejieSKxWDy/4nkLM5MMQxSFdWtetve0w5PIydpnU9P8U1CYc+zsVbCoMCyD8qXEJ58lAX7sxBQ+iCfz7lblHoygAehHvpE/7QatiDjHP6btyDT/2z52S0LvGx2JoFgZwQ0fcFzQKZB1QFR6xnv1678VG7LONmDCG/Z4sn2d3eIXl1IRiGGhjMtaGbT3a8o5PhI+++URFs5XzMp7Kuyfqi72kFf9lGcnYunA09Zy3ksmnO+Tu7WkADi2Bzh9qWVIvEViM/wYHvOedDB8L32U1OuMIqkIEZKtX6kwmvau0wY6nQF4ZfQWJXkKZ/mW0cvIkBZtFTMs5tFG6BBeK3aFs/RkF4D4DUWrN+OdqOkdNBCxk2RG1BRbkljJKWtJcVNBgIJogaMjKOLz0yn9bKRTIb68eIrCSjNpa6Z/AY1HZnaAyUqFxe/rIykPO8vekKAWM6C7gTj+7nM4aEtpMHo2RQhqd+eZs5CcSP53WqpOubkhhJX/NxQWCZWa7Y2be9Ic",
+    "expiration": "2026-07-31T08:59:06.000Z",
+    "backend": "GIT_BACKEND_S3"
+  },
+  "name": "encuestas-iatur",
+  "path": "/home/ubuntu/encuestas-iatur",
+  "port": 3000,
+  "secrets": {
+    "BUILT_IN_FORGE_API_KEY": "WXf6nETqJAi7NThP24tyPd",
+    "BUILT_IN_FORGE_API_URL": "https://forge.manus.ai",
+    "JWT_SECRET": "CNBpjJU7SoNwDEUFA2wdnH",
+    "OAUTH_SERVER_URL": "https://api.manus.im",
+    "OWNER_NAME": "Juan Luis Blanco Guzmán",
+    "OWNER_OPEN_ID": "Wi8wkigJgUccnyMSPba6VR",
+    "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",
+    "VITE_ANALYTICS_WEBSITE_ID": "ee7ff520-3a5e-4edd-b776-2e33dd9258b5",
+    "VITE_APP_ID": "nHD7C8PRaURA7Ubm8Aop3k",
+    "VITE_APP_LOGO": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310419663031419078/AgmIAmedroBCiRTn.png",
+    "VITE_APP_TITLE": "IATUR Encuestas - Trabajo de Campo",
+    "VITE_FRONTEND_FORGE_API_KEY": "42shyTqwZyqow43gfguY6y",
+    "VITE_FRONTEND_FORGE_API_URL": "https://forge.manus.ai",
+    "VITE_OAUTH_PORTAL_URL": "https://manus.im"
+  },
+  "template_id": "web-db-user",
+  "test_command": "pnpm test"
+}
