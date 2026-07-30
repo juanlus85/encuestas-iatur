@@ -14,6 +14,23 @@ type ViewMode = "markers" | "heatmap" | "live";
 // Centro del Barrio de Santa Cruz, Sevilla
 const CENTER: [number, number] = [37.3861, -5.9915];
 
+// Gradiente del heatmap
+const HEAT_GRADIENT = {
+  0.0: "rgba(0,128,0,0)",
+  0.25: "#00cc00",
+  0.5: "#ffff00",
+  0.75: "#ff8800",
+  1.0: "#ff0000",
+};
+
+function metersToPixels(map: L.Map, meters: number): number {
+  const zoom = map.getZoom();
+  const center = map.getCenter();
+  const latRad = (center.lat * Math.PI) / 180;
+  const metersPerPx = (156543.03392 * Math.cos(latRad)) / Math.pow(2, zoom);
+  return Math.max(10, Math.round(meters / metersPerPx));
+}
+
 // ─── Legend ───────────────────────────────────────────────────────────────────
 function MapLegend({ mode }: { mode: ViewMode }) {
   if (mode === "heatmap") {
@@ -266,6 +283,8 @@ function LeafletMapView({
   const mapRef = useRef<L.Map | null>(null);
   const heatLayerRef = useRef<any>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const heatDataRef = useRef<[number, number, number][]>([]);
+  const heatMaxRef = useRef<number>(1);
 
   // Inicializar mapa una sola vez
   useEffect(() => {
@@ -286,7 +305,24 @@ function LeafletMapView({
     mapRef.current = map;
     markersLayerRef.current = L.layerGroup().addTo(map);
 
+    // Redibujar heatmap con radio correcto al cambiar zoom
+    const onZoomEnd = () => {
+      if (!heatLayerRef.current || heatDataRef.current.length === 0) return;
+      const newRadius = metersToPixels(map, 30);
+      map.removeLayer(heatLayerRef.current);
+      heatLayerRef.current = (L as any).heatLayer(heatDataRef.current, {
+        radius: newRadius,
+        blur: Math.round(newRadius * 0.65),
+        maxZoom: 19,
+        max: heatMaxRef.current,
+        minOpacity: 0.05,
+        gradient: HEAT_GRADIENT,
+      }).addTo(map);
+    };
+    map.on("zoomend", onZoomEnd);
+
     return () => {
+      map.off("zoomend", onZoomEnd);
       map.remove();
       mapRef.current = null;
       heatLayerRef.current = null;
@@ -337,20 +373,19 @@ function LeafletMapView({
         Math.min(c.weight, maxVal),
       ]);
 
+      // Guardar en refs para que el listener de zoom pueda redibujar
+      heatDataRef.current = heatData;
+      heatMaxRef.current = maxVal;
+
+      const radius = metersToPixels(map, 30);
       heatLayerRef.current = (L as any)
         .heatLayer(heatData, {
-          radius: 22,
-          blur: 15,
+          radius,
+          blur: Math.round(radius * 0.65),
           maxZoom: 19,
           max: maxVal,
           minOpacity: 0.05,
-          gradient: {
-            0.0: "rgba(0,128,0,0)",
-            0.25: "#00cc00",
-            0.5: "#ffff00",
-            0.75: "#ff8800",
-            1.0: "#ff0000",
-          },
+          gradient: HEAT_GRADIENT,
         })
         .addTo(map);
     } else {
