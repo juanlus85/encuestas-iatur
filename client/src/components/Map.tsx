@@ -100,7 +100,9 @@ function loadMapScript() {
   }
   mapScriptPromise = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry,visualization`;
+    // v=3.58: última versión estable de Google Maps que incluye HeatmapLayer
+    // v=weekly (3.65+) eliminó HeatmapLayer
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=3.58&libraries=marker,places,geocoding,geometry,visualization`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
