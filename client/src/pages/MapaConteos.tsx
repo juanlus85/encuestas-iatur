@@ -15,24 +15,20 @@ const SURVEY_POINTS = [
   "Mesón del Moro",
 ];
 
-const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
-const FORGE_BASE_URL =
-  import.meta.env.VITE_FRONTEND_FORGE_API_URL || "https://forge.butterfly-effect.dev";
-const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
-
-// Carga el script de Google Maps con la librería visualization incluida
+const GOOGLE_MAPS_API_KEY =
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+  "AIzaSyDMho7U8Eb1RJHc3xKNFEAETvcUBEpCCq8";
+// Carga el script de Google Maps con v=3.58 (última versión estable con HeatmapLayer)
 let mapScriptPromise: Promise<void> | null = null;
 function loadMapScript(): Promise<void> {
   if (mapScriptPromise) return mapScriptPromise;
-  // Si ya está cargado, resolver inmediatamente
-  if (typeof window !== "undefined" && (window as any).google?.maps?.visualization) {
+  if (typeof window !== "undefined" && (window as any).google?.maps) {
     return Promise.resolve();
   }
   mapScriptPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry,visualization`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=3.58&libraries=marker,places,geocoding,geometry,visualization`;
     script.async = true;
-    script.crossOrigin = "anonymous";
     script.onload = () => resolve();
     script.onerror = () => {
       mapScriptPromise = null;

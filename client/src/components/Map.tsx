@@ -87,25 +87,22 @@ declare global {
 }
 
 const GOOGLE_MAPS_API_KEY =
-  import.meta.env.VITE_FRONTEND_FORGE_API_KEY ||
   import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
   "AIzaSyDMho7U8Eb1RJHc3xKNFEAETvcUBEpCCq8";
-const FORGE_BASE_URL =
-  import.meta.env.VITE_FRONTEND_FORGE_API_URL || "https://forge.butterfly-effect.dev";
-const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
 let mapScriptPromise: Promise<void> | null = null;
 
 function loadMapScript() {
   if (mapScriptPromise) return mapScriptPromise;
-  // Verificar que visualization también esté cargado, no solo google.maps base
-  if (window.google?.maps && (window.google.maps as any).visualization) {
+  if (window.google?.maps) {
     mapScriptPromise = Promise.resolve();
     return mapScriptPromise;
   }
   mapScriptPromise = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry,visualization`;
+    // Usar v=3.58 (última versión estable que mantiene HeatmapLayer)
+    // v=weekly apunta a 3.65+ que eliminó HeatmapLayer
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=3.58&libraries=marker,places,geocoding,geometry,visualization`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
