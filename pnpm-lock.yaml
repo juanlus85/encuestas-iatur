@@ -163,6 +163,9 @@ importers:
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
+      leaflet-image:
+        specifier: ^0.4.0
+        version: 0.4.0
       leaflet.heat:
         specifier: ^0.2.0
         version: 0.2.0
@@ -3325,6 +3328,9 @@ packages:
     resolution: {integrity: sha512-04xDrxQTDTCFwP5H6hRhsRcb9xxv2RzkcsygFzmkSIOJy3PeRJP7sNk3VRIbKXcog561P9oU0/rVH6vDROAgUw==}
     engines: {node: '>=12'}
 
+  d3-queue@2.0.3:
+    resolution: {integrity: sha512-ejbdHqZYEmk9ns/ljSbEcD6VRiuNwAkZMdFf6rsUb3vHROK5iMFd8xewDQnUVr6m/ba2BG63KmR/LySfsluxbg==}
+
   d3-random@3.0.1:
     resolution: {integrity: sha512-FXMe9GfxTxqd5D6jFsQ+DJ8BJS4E/fT5mqqdjovykEB2oFbTMDVdg1MGFxfQW+FBOGoB++k8swBrgwSHT1cUXQ==}
     engines: {node: '>=12'}
@@ -4183,6 +4189,9 @@ packages:
 
   layout-base@2.0.1:
     resolution: {integrity: sha512-dp3s92+uNI1hWIpPGH3jK2kxE2lMjdXdr+DH8ynZHpd6PUlH6x6cbuXnoMmiNumznqaNO31xu9e79F0uuZ0JFg==}
+
+  leaflet-image@0.4.0:
+    resolution: {integrity: sha512-J/vLCHiYNXlcQ/SZbHhj/VF5k3thxTryWijoqMO9sB20KV7hlMNUZDgxcDzXnfjk4hcYcFfGbveVc1tyQ9FgYw==}
 
   leaflet.heat@0.2.0:
     resolution: {integrity: sha512-Cd5PbAA/rX3X3XKxfDoUGi9qp78FyhWYurFg3nsfhntcM/MCNK08pRkf4iEenO1KNqwVPKCmkyktjW3UD+h9bQ==}
@@ -9101,6 +9110,8 @@ snapshots:
 
   d3-quadtree@3.0.1: {}
 
+  d3-queue@2.0.3: {}
+
   d3-random@3.0.1: {}
 
   d3-sankey@0.12.3:
@@ -10084,6 +10095,10 @@ snapshots:
   layout-base@1.0.2: {}
 
   layout-base@2.0.1: {}
+
+  leaflet-image@0.4.0:
+    dependencies:
+      d3-queue: 2.0.3
 
   leaflet.heat@0.2.0: {}
 

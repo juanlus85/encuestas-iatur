@@ -6,7 +6,8 @@ import { trpc } from "@/lib/trpc";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
-import { Loader2, MapPin, Radio, RefreshCw, Thermometer, UserCheck } from "lucide-react";
+import leafletImage from "leaflet-image";
+import { Download, Loader2, MapPin, Radio, RefreshCw, Thermometer, UserCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type ViewMode = "markers" | "heatmap" | "live";
@@ -285,6 +286,22 @@ function LeafletMapView({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const heatDataRef = useRef<[number, number, number][]>([]);
   const heatMaxRef = useRef<number>(1);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const downloadPng = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    setIsDownloading(true);
+    leafletImage(map, (err, canvas) => {
+      setIsDownloading(false);
+      if (err || !canvas) return;
+      const link = document.createElement("a");
+      const date = new Date().toISOString().slice(0, 10);
+      link.download = `mapa-calor-encuestas-${date}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  };
 
   // Inicializar mapa una sola vez
   useEffect(() => {
@@ -418,7 +435,26 @@ function LeafletMapView({
     }
   }, [mode, validLocations]);
 
-  return <div ref={mapContainerRef} className="w-full h-full" />;
+  return (
+    <div className="relative w-full h-full">
+      <div ref={mapContainerRef} className="w-full h-full" />
+      {mode === "heatmap" && (
+        <button
+          onClick={downloadPng}
+          disabled={isDownloading}
+          title="Descargar mapa de calor como PNG"
+          className="absolute bottom-4 right-4 z-[1000] flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-white/90 hover:bg-white border border-gray-200 shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700"
+        >
+          {isDownloading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {isDownloading ? "Generando..." : "Descargar PNG"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

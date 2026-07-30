@@ -1,11 +1,12 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Loader2, PersonStanding, Thermometer, MapPin } from "lucide-react";
+import { Download, Loader2, PersonStanding, Thermometer, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
+import leafletImage from "leaflet-image";
 
 type ViewMode = "heatmap" | "markers";
 
@@ -71,6 +72,22 @@ export default function MapaConteos() {
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const heatDataRef = useRef<[number, number, number][]>([]);
   const heatMaxRef = useRef<number>(1);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const downloadPng = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    setIsDownloading(true);
+    leafletImage(map, (err, canvas) => {
+      setIsDownloading(false);
+      if (err || !canvas) return;
+      const link = document.createElement("a");
+      const date = new Date().toISOString().slice(0, 10);
+      link.download = `mapa-calor-conteos-${date}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  };
 
   const { data: passes = [], isLoading } = trpc.passes.list.useQuery({
     dateFrom: dateFrom || undefined,
@@ -245,6 +262,18 @@ export default function MapaConteos() {
                 : `${validPasses.length} pases con GPS · ${totalPersonas.toLocaleString("es-ES")} personas`}
             </p>
           </div>
+          <button
+            onClick={downloadPng}
+            disabled={isDownloading || isLoading || validPasses.length === 0}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDownloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {isDownloading ? "Generando..." : "Descargar PNG"}
+          </button>
         </div>
 
         {/* Controls */}
