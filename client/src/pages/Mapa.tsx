@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { drawHeatmap } from "@/lib/drawHeatmap";
 import { Loader2, MapPin, Radio, RefreshCw, Thermometer, UserCheck } from "lucide-react";
 import { useState } from "react";
 
@@ -281,27 +282,13 @@ export default function Mapa() {
         marker.addListener("click", () => infoWindow.open(map, marker));
       });
     } else if (mode === "heatmap") {
-      const heatmapData = validLocations.map((loc) =>
-        new google.maps.LatLng(Number(loc.latitude), Number(loc.longitude))
-      );
-      new (google.maps as any).visualization.HeatmapLayer({
-        data: heatmapData,
-        map,
-        radius: 25,
-        opacity: 0.75,
-        gradient: [
-          "rgba(0, 255, 0, 0)",
-          "rgba(0, 255, 0, 1)",
-          "rgba(64, 220, 0, 1)",
-          "rgba(128, 200, 0, 1)",
-          "rgba(180, 180, 0, 1)",
-          "rgba(220, 160, 0, 1)",
-          "rgba(255, 140, 0, 1)",
-          "rgba(255, 100, 0, 1)",
-          "rgba(255, 60, 0, 1)",
-          "rgba(255, 0, 0, 1)",
-        ],
-      });
+      // Usar drawHeatmap (simpleheat) en lugar de HeatmapLayer (eliminado en v3.65)
+      const heatPoints = validLocations.map((loc: any) => ({
+        lat: Number(loc.latitude),
+        lng: Number(loc.longitude),
+        weight: 1,
+      }));
+      drawHeatmap(map, heatPoints, { radius: 25, blur: 15, maxOpacity: 0.75 });
     }
   };
 

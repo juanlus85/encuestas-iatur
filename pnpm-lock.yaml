@@ -118,6 +118,9 @@ importers:
       '@types/bcryptjs':
         specifier: ^3.0.0
         version: 3.0.0
+      '@types/simpleheat':
+        specifier: ^0.4.3
+        version: 0.4.3
       axios:
         specifier: ^1.12.0
         version: 1.12.2
@@ -190,6 +193,9 @@ importers:
       recharts:
         specifier: ^2.15.2
         version: 2.15.4(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      simpleheat:
+        specifier: ^0.4.0
+        version: 0.4.0
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
@@ -2875,6 +2881,9 @@ packages:
   '@types/serve-static@1.15.9':
     resolution: {integrity: sha512-dOTIuqpWLyl3BBXU3maNQsS4A3zuuoYRNIvYSxxhebPfXg2mzWQEPne/nlJ37yOse6uGgR386uTpdsx4D0QZWA==}
 
+  '@types/simpleheat@0.4.3':
+    resolution: {integrity: sha512-E83XPXcdHTNA/BiNZ6FxSMrTIuHv+gfCjf+dccJu8S6miHSuCeIti4S2lAHCsqm1SC2OKRGKaVvayICTa2RpLg==}
+
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
 
@@ -4986,6 +4995,9 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
+
+  simpleheat@0.4.0:
+    resolution: {integrity: sha512-tdg3I1NvzMdPKscWBrHbF0LBf+VWuBBazzGUPtFJjG5Q12VQX6gPY8jLy9hx5CbgAIVc5nfnePwJvAYK6z1rAA==}
 
   smob@1.6.1:
     resolution: {integrity: sha512-KAkBqZl3c2GvNgNhcoyJae1aKldDW0LO279wF9bk1PnluRTETKBq0WyzRXxEhoQLk56yHaOY4JCBEKDuJIET5g==}
@@ -8629,6 +8641,8 @@ snapshots:
       '@types/node': 24.7.0
       '@types/send': 0.17.5
 
+  '@types/simpleheat@0.4.3': {}
+
   '@types/trusted-types@2.0.7': {}
 
   '@types/unist@2.0.11': {}
@@ -11194,6 +11208,8 @@ snapshots:
   siginfo@2.0.0: {}
 
   signal-exit@4.1.0: {}
+
+  simpleheat@0.4.0: {}
 
   smob@1.6.1: {}
 

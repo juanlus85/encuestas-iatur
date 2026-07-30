@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Loader2, PersonStanding, Thermometer, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { drawHeatmap, clearHeatmap } from "@/lib/drawHeatmap";
 
 type ViewMode = "heatmap" | "markers";
 
@@ -122,29 +123,13 @@ export default function MapaConteos() {
         const map = mapInstanceRef.current;
 
         if (mode === "heatmap") {
-          const heatmapData = validPasses.map((p: any) => ({
-            location: new window.google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
-            weight: Math.max(1, Number(p.count) ?? 1),
+          // Usar drawHeatmap (simpleheat) en lugar de HeatmapLayer (eliminado en v3.65)
+          const heatPoints = validPasses.map((p: any) => ({
+            lat: Number(p.latitude),
+            lng: Number(p.longitude),
+            weight: Math.min(1, Math.max(0.1, (Number(p.count) ?? 1) / 200)),
           }));
-
-          new (window.google.maps as any).visualization.HeatmapLayer({
-            data: heatmapData,
-            map,
-            radius: 35,
-            opacity: 0.8,
-            gradient: [
-              "rgba(0, 255, 0, 0)",
-              "rgba(0, 255, 0, 1)",
-              "rgba(64, 220, 0, 1)",
-              "rgba(128, 200, 0, 1)",
-              "rgba(180, 180, 0, 1)",
-              "rgba(220, 160, 0, 1)",
-              "rgba(255, 140, 0, 1)",
-              "rgba(255, 100, 0, 1)",
-              "rgba(255, 60, 0, 1)",
-              "rgba(255, 0, 0, 1)",
-            ],
-          });
+          drawHeatmap(map, heatPoints, { radius: 35, blur: 20, maxOpacity: 0.8 });
         } else {
           // Marcadores con tamaño proporcional al count
           validPasses.forEach((p: any) => {
@@ -187,6 +172,7 @@ export default function MapaConteos() {
 
     return () => {
       cancelled = true;
+      clearHeatmap();
     };
   }, [isLoading, validPasses.length, mode, dateFrom, dateTo, surveyPoint]);
 
