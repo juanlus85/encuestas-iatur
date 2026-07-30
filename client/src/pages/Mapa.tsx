@@ -309,28 +309,47 @@ function LeafletMapView({
     if (validLocations.length === 0) return;
 
     if (mode === "heatmap") {
-      // Cada encuesta tiene peso 1; usamos max = percentil 90 de densidad local
-      // Para encuestas (peso uniforme) el p90 es siempre 1, pero dejamos la lógica
-      // consistente con MapaConteos para facilitar futuros ajustes
-      const heatData: [number, number, number][] = validLocations.map((loc) => [
-        Number(loc.latitude),
-        Number(loc.longitude),
-        1,
+      // AGREGACIÓN ESPACIAL: agrupar encuestas en celdas de ~15m
+      const CELL_LAT = 15 / 111000;
+      const CELL_LNG = 15 / 80000;
+
+      const cellMap = new Map<string, { lat: number; lng: number; weight: number }>();
+      validLocations.forEach((loc: any) => {
+        const lat = Number(loc.latitude);
+        const lng = Number(loc.longitude);
+        const cLat = Math.round(lat / CELL_LAT);
+        const cLng = Math.round(lng / CELL_LNG);
+        const key = `${cLat},${cLng}`;
+        if (cellMap.has(key)) {
+          cellMap.get(key)!.weight += 1;
+        } else {
+          cellMap.set(key, { lat: cLat * CELL_LAT, lng: cLng * CELL_LNG, weight: 1 });
+        }
+      });
+
+      const aggregated = Array.from(cellMap.values());
+      const weights = aggregated.map((c) => c.weight).sort((a, b) => a - b);
+      const maxVal = weights[Math.floor(weights.length * 0.85)] || weights[weights.length - 1];
+
+      const heatData: [number, number, number][] = aggregated.map((c) => [
+        c.lat,
+        c.lng,
+        Math.min(c.weight, maxVal),
       ]);
 
       heatLayerRef.current = (L as any)
         .heatLayer(heatData, {
-          radius: 18,
-          blur: 12,
+          radius: 22,
+          blur: 15,
           maxZoom: 19,
-          max: 1,
+          max: maxVal,
           minOpacity: 0.05,
           gradient: {
             0.0: "rgba(0,128,0,0)",
-            0.2: "green",
-            0.5: "yellow",
-            0.75: "orange",
-            1.0: "red",
+            0.25: "#00cc00",
+            0.5: "#ffff00",
+            0.75: "#ff8800",
+            1.0: "#ff0000",
           },
         })
         .addTo(map);

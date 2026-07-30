@@ -114,31 +114,51 @@ export default function MapaConteos() {
     if (validPasses.length === 0) return;
 
     if (mode === "heatmap") {
-      // leaflet.heat: array de [lat, lng, intensity]
-      // Usamos el count real como intensidad (sin normalizar)
-      // y fijamos max al percentil 90 para que solo los picos reales sean rojos
-      const counts = validPasses.map((p: any) => Number(p.count) || 1);
-      const sorted = [...counts].sort((a, b) => a - b);
-      const p90 = sorted[Math.floor(sorted.length * 0.9)] || sorted[sorted.length - 1];
+      // AGREGACIÓN ESPACIAL: agrupar puntos en celdas de ~15m antes de pasarlos
+      // al heatmap. Esto evita que la acumulación de miles de puntos GPS
+      // individuales en la misma zona sature el color rojo.
+      // 1 grado lat ≈ 111km, 1 grado lng ≈ 80km en Sevilla → celda de 15m
+      const CELL_LAT = 15 / 111000;
+      const CELL_LNG = 15 / 80000;
 
-      const heatData: [number, number, number][] = validPasses.map((p: any) => [
-        Number(p.latitude),
-        Number(p.longitude),
-        Number(p.count) || 1,
+      const cellMap = new Map<string, { lat: number; lng: number; weight: number }>();
+      validPasses.forEach((p: any) => {
+        const lat = Number(p.latitude);
+        const lng = Number(p.longitude);
+        const w = Number(p.count) || 1;
+        const cLat = Math.round(lat / CELL_LAT);
+        const cLng = Math.round(lng / CELL_LNG);
+        const key = `${cLat},${cLng}`;
+        if (cellMap.has(key)) {
+          cellMap.get(key)!.weight += w;
+        } else {
+          cellMap.set(key, { lat: cLat * CELL_LAT, lng: cLng * CELL_LNG, weight: w });
+        }
+      });
+
+      const aggregated = Array.from(cellMap.values());
+      const weights = aggregated.map((c) => c.weight).sort((a, b) => a - b);
+      // max = percentil 85: solo el 15% superior de celdas llega a rojo
+      const maxVal = weights[Math.floor(weights.length * 0.85)] || weights[weights.length - 1];
+
+      const heatData: [number, number, number][] = aggregated.map((c) => [
+        c.lat,
+        c.lng,
+        Math.min(c.weight, maxVal), // cap para que nada supere el max
       ]);
 
       heatLayerRef.current = (L as any).heatLayer(heatData, {
-        radius: 18,        // radio más pequeño = manchas más precisas
-        blur: 12,          // menos difuminado = bordes más nítidos
+        radius: 22,
+        blur: 15,
         maxZoom: 19,
-        max: p90,          // solo el top 10% llega a rojo
+        max: maxVal,
         minOpacity: 0.05,
         gradient: {
           0.0: "rgba(0,128,0,0)",
-          0.2: "green",
-          0.5: "yellow",
-          0.75: "orange",
-          1.0: "red",
+          0.25: "#00cc00",
+          0.5: "#ffff00",
+          0.75: "#ff8800",
+          1.0: "#ff0000",
         },
       }).addTo(map);
     } else {
