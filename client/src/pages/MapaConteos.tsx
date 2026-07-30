@@ -123,9 +123,9 @@ export default function MapaConteos() {
           const heatPoints = validPasses.map((p: any) => ({
             lat: Number(p.latitude),
             lng: Number(p.longitude),
-            weight: Math.min(1, Math.max(0.1, (Number(p.count) ?? 1) / 200)),
+            weight: Math.max(1, Number(p.count) ?? 1), // peso real = nº de personas
           }));
-          drawHeatmap(map, heatPoints, { radius: 35, blur: 20, maxOpacity: 0.8 });
+          drawHeatmap(map, heatPoints, { radius: 18, blur: 12, maxOpacity: 0.78 });
         } else {
           // Marcadores con tamaño proporcional al count
           validPasses.forEach((p: any) => {

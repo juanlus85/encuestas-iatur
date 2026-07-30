@@ -288,7 +288,7 @@ export default function Mapa() {
         lng: Number(loc.longitude),
         weight: 1,
       }));
-      drawHeatmap(map, heatPoints, { radius: 25, blur: 15, maxOpacity: 0.75 });
+      drawHeatmap(map, heatPoints, { radius: 18, blur: 12, maxOpacity: 0.72 });
     }
   };
 

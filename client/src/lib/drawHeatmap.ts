@@ -3,17 +3,21 @@
  * Reemplaza HeatmapLayer de Google Maps (eliminado en v3.65)
  * Usa simpleheat sobre un <canvas> superpuesto al mapa de Google Maps.
  *
- * La escala de color refleja densidad real:
- *   verde → pocos puntos cercanos
- *   amarillo → densidad media
- *   rojo → alta concentración
+ * La escala de color refleja el PESO de cada punto (no densidad acumulada):
+ *   verde → peso bajo (pocas personas / pocas encuestas)
+ *   amarillo → peso medio
+ *   rojo → peso alto (muchas personas / muchas encuestas)
+ *
+ * Para que el gradiente funcione correctamente, los pesos deben pasarse
+ * en su valor real (no normalizados a 0-1). drawHeatmap calcula el max
+ * automáticamente como el máximo de los pesos recibidos.
  */
 import simpleheat from "simpleheat";
 
 export interface HeatPoint {
   lat: number;
   lng: number;
-  weight?: number; // 0-1, por defecto 1
+  weight?: number; // valor real, ej: número de personas o 1 por encuesta
 }
 
 let canvas: HTMLCanvasElement | null = null;
@@ -21,6 +25,8 @@ let heat: ReturnType<typeof simpleheat> | null = null;
 let currentMap: google.maps.Map | null = null;
 let overlayView: google.maps.OverlayView | null = null;
 let boundsListener: google.maps.MapsEventListener | null = null;
+let currentPoints: HeatPoint[] = [];
+let currentOptions: Parameters<typeof drawHeatmap>[2] = {};
 
 /** Elimina el heatmap actual del mapa */
 export function clearHeatmap() {
@@ -35,42 +41,12 @@ export function clearHeatmap() {
   canvas = null;
   heat = null;
   currentMap = null;
-}
-
-/**
- * Calcula el valor "max" para simpleheat basándose en la densidad real de los puntos.
- * Agrupa los puntos en celdas de ~30px y cuenta cuántos caen en cada celda.
- * El max se fija en el percentil 90 de densidad (no en el absoluto), para que
- * zonas con pocos puntos aparezcan verdes aunque haya una zona muy densa.
- */
-function computeMax(
-  heatData: [number, number, number][],
-  radius: number
-): number {
-  if (!heatData.length) return 1;
-
-  // Agrupar en celdas del tamaño del radio
-  const cellSize = radius;
-  const cells: Record<string, number> = {};
-  for (const [x, y, w] of heatData) {
-    const cx = Math.floor(x / cellSize);
-    const cy = Math.floor(y / cellSize);
-    const key = `${cx},${cy}`;
-    cells[key] = (cells[key] ?? 0) + w;
-  }
-
-  const values = Object.values(cells).sort((a, b) => a - b);
-  if (!values.length) return 1;
-
-  // Percentil 85: el 15% más denso será rojo, el resto tendrá gradiente
-  const p85idx = Math.floor(values.length * 0.85);
-  const p85 = values[Math.min(p85idx, values.length - 1)];
-  return Math.max(1, p85);
+  currentPoints = [];
 }
 
 /**
  * Dibuja un heatmap sobre un mapa de Google Maps usando simpleheat.
- * Llama a clearHeatmap() antes de dibujar uno nuevo si cambias los datos.
+ * Los pesos se pasan en valor real; el max se calcula como el máximo absoluto.
  */
 export function drawHeatmap(
   map: google.maps.Map,
@@ -86,8 +62,14 @@ export function drawHeatmap(
   if (!points.length) return;
 
   currentMap = map;
-  const radius = options?.radius ?? 20;
-  const blur = options?.blur ?? 15;
+  currentPoints = points;
+  currentOptions = options;
+
+  // Calcular el peso máximo para normalizar la escala
+  const maxWeight = Math.max(...points.map((p) => p.weight ?? 1));
+
+  const radius = options?.radius ?? 18;
+  const blur = options?.blur ?? 12;
 
   class HeatOverlay extends google.maps.OverlayView {
     onAdd() {
@@ -109,7 +91,6 @@ export function drawHeatmap(
       const bounds = currentMap.getBounds();
       if (!bounds) return;
 
-      // Calcular tamaño del canvas según los bounds del mapa
       const sw = projection.fromLatLngToDivPixel(bounds.getSouthWest())!;
       const ne = projection.fromLatLngToDivPixel(bounds.getNorthEast())!;
 
@@ -123,8 +104,7 @@ export function drawHeatmap(
       canvas.style.left = Math.min(sw.x, ne.x) + "px";
       canvas.style.top = Math.min(ne.y, sw.y) + "px";
 
-      // Convertir lat/lng a coordenadas de pixel relativas al canvas
-      const heatData: [number, number, number][] = points
+      const heatData: [number, number, number][] = currentPoints
         .map((p) => {
           const pixel = projection.fromLatLngToDivPixel(
             new google.maps.LatLng(p.lat, p.lng)
@@ -132,6 +112,7 @@ export function drawHeatmap(
           if (!pixel) return null;
           const x = pixel.x - Math.min(sw.x, ne.x);
           const y = pixel.y - Math.min(ne.y, sw.y);
+          // Pasar el peso real (no normalizado); simpleheat lo compara contra max
           return [x, y, p.weight ?? 1] as [number, number, number];
         })
         .filter(Boolean) as [number, number, number][];
@@ -141,27 +122,25 @@ export function drawHeatmap(
       heat = simpleheat(canvas);
       heat.data(heatData);
       heat.radius(radius, blur);
-
-      // Calcular max dinámico basado en densidad real (percentil 85)
-      const maxVal = computeMax(heatData, radius);
-      heat.max(maxVal);
+      // max = peso máximo absoluto → el punto más "pesado" será rojo,
+      // los demás tendrán el color proporcional a su peso
+      heat.max(maxWeight);
 
       if (options?.gradient) {
         heat.gradient(options.gradient);
       } else {
-        // Verde → amarillo → naranja → rojo según densidad
         heat.gradient({
-          0.0: "rgba(0,255,0,0)",
-          0.25: "rgba(0,200,0,0.6)",
-          0.45: "rgba(100,220,0,0.75)",
-          0.6: "rgba(220,200,0,0.85)",
-          0.75: "rgba(255,140,0,0.9)",
-          0.9: "rgba(255,60,0,1)",
+          0.0: "rgba(0,200,0,0)",
+          0.2: "rgba(0,200,0,0.55)",
+          0.4: "rgba(100,210,0,0.7)",
+          0.55: "rgba(200,210,0,0.8)",
+          0.7: "rgba(255,160,0,0.88)",
+          0.85: "rgba(255,80,0,0.95)",
           1.0: "rgba(255,0,0,1)",
         });
       }
 
-      heat.draw(options?.maxOpacity ?? 0.7);
+      heat.draw(options?.maxOpacity ?? 0.72);
     }
 
     onRemove() {
@@ -175,7 +154,6 @@ export function drawHeatmap(
   overlayView = new HeatOverlay();
   overlayView.setMap(map);
 
-  // Redibujar cuando el mapa cambia (zoom/pan)
   boundsListener = google.maps.event.addListener(map, "bounds_changed", () => {
     if (overlayView) (overlayView as any).draw();
   });
