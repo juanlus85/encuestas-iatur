@@ -115,22 +115,29 @@ export default function MapaConteos() {
 
     if (mode === "heatmap") {
       // leaflet.heat: array de [lat, lng, intensity]
-      const maxCount = Math.max(...validPasses.map((p: any) => Number(p.count) || 1));
+      // Usamos el count real como intensidad (sin normalizar)
+      // y fijamos max al percentil 90 para que solo los picos reales sean rojos
+      const counts = validPasses.map((p: any) => Number(p.count) || 1);
+      const sorted = [...counts].sort((a, b) => a - b);
+      const p90 = sorted[Math.floor(sorted.length * 0.9)] || sorted[sorted.length - 1];
+
       const heatData: [number, number, number][] = validPasses.map((p: any) => [
         Number(p.latitude),
         Number(p.longitude),
-        (Number(p.count) || 1) / maxCount, // normalizado 0-1
+        Number(p.count) || 1,
       ]);
 
       heatLayerRef.current = (L as any).heatLayer(heatData, {
-        radius: 25,
-        blur: 20,
-        maxZoom: 17,
-        max: 1.0,
+        radius: 18,        // radio más pequeño = manchas más precisas
+        blur: 12,          // menos difuminado = bordes más nítidos
+        maxZoom: 19,
+        max: p90,          // solo el top 10% llega a rojo
+        minOpacity: 0.05,
         gradient: {
-          0.0: "green",
-          0.4: "yellow",
-          0.7: "orange",
+          0.0: "rgba(0,128,0,0)",
+          0.2: "green",
+          0.5: "yellow",
+          0.75: "orange",
           1.0: "red",
         },
       }).addTo(map);

@@ -309,6 +309,9 @@ function LeafletMapView({
     if (validLocations.length === 0) return;
 
     if (mode === "heatmap") {
+      // Cada encuesta tiene peso 1; usamos max = percentil 90 de densidad local
+      // Para encuestas (peso uniforme) el p90 es siempre 1, pero dejamos la lógica
+      // consistente con MapaConteos para facilitar futuros ajustes
       const heatData: [number, number, number][] = validLocations.map((loc) => [
         Number(loc.latitude),
         Number(loc.longitude),
@@ -317,13 +320,16 @@ function LeafletMapView({
 
       heatLayerRef.current = (L as any)
         .heatLayer(heatData, {
-          radius: 25,
-          blur: 20,
-          maxZoom: 17,
+          radius: 18,
+          blur: 12,
+          maxZoom: 19,
+          max: 1,
+          minOpacity: 0.05,
           gradient: {
-            0.0: "green",
-            0.4: "yellow",
-            0.7: "orange",
+            0.0: "rgba(0,128,0,0)",
+            0.2: "green",
+            0.5: "yellow",
+            0.75: "orange",
             1.0: "red",
           },
         })
