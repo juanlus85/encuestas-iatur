@@ -3,6 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Loader2, PersonStanding, Thermometer, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import "leaflet.heat";
 
 type ViewMode = "heatmap" | "markers";
 
@@ -14,33 +17,9 @@ const SURVEY_POINTS = [
   "Mesón del Moro",
 ];
 
-const GOOGLE_MAPS_API_KEY =
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
-  "AIzaSyDMho7U8Eb1RJHc3xKNFEAETvcUBEpCCq8";
-
-// Carga el script de Google Maps con la librería visualization incluida
-let mapScriptPromise: Promise<void> | null = null;
-function loadMapScript(): Promise<void> {
-  if (mapScriptPromise) return mapScriptPromise;
-  // Si ya está cargado, resolver inmediatamente
-  if (typeof window !== "undefined" && (window as any).google?.maps?.visualization) {
-    return Promise.resolve();
-  }
-  mapScriptPromise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    // v=3.58: última versión estable de Google Maps que incluye HeatmapLayer
-    // v=weekly (3.65+) eliminó HeatmapLayer
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=3.58&libraries=marker,places,geocoding,geometry,visualization`;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => {
-      mapScriptPromise = null;
-      reject(new Error("Failed to load Google Maps"));
-    };
-    document.head.appendChild(script);
-  });
-  return mapScriptPromise;
-}
+// Centro del Barrio de Santa Cruz, Sevilla
+const CENTER: [number, number] = [37.3861, -5.9915];
+const ZOOM = 17;
 
 function HeatmapLegend() {
   return (
@@ -68,8 +47,9 @@ export default function MapaConteos() {
   const [dateTo, setDateTo] = useState("");
   const [surveyPoint, setSurveyPoint] = useState("");
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const [mapError, setMapError] = useState<string | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const heatLayerRef = useRef<any>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
   const { data: passes = [], isLoading } = trpc.passes.list.useQuery({
     dateFrom: dateFrom || undefined,
@@ -81,113 +61,109 @@ export default function MapaConteos() {
     (p) => p.latitude != null && p.longitude != null
   );
 
-  const totalPersonas = validPasses.reduce((sum: number, p: any) => sum + (Number(p.count) ?? 1), 0);
+  const totalPersonas = validPasses.reduce(
+    (sum: number, p: any) => sum + (Number(p.count) ?? 1),
+    0
+  );
 
-  // Inicializar el mapa y dibujar los datos cuando tengamos tanto el mapa como los datos
+  // Inicializar el mapa Leaflet una sola vez
   useEffect(() => {
-    if (isLoading) return;
-    if (validPasses.length === 0) return;
     if (!mapContainerRef.current) return;
+    if (mapRef.current) return; // ya inicializado
 
-    let cancelled = false;
+    const map = L.map(mapContainerRef.current, {
+      center: CENTER,
+      zoom: ZOOM,
+      zoomControl: true,
+    });
 
-    loadMapScript()
-      .then(() => {
-        if (cancelled || !mapContainerRef.current) return;
+    // Tiles de OpenStreetMap (gratuito, sin API key)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
 
-        // Crear o reutilizar el mapa
-        if (!mapInstanceRef.current) {
-          mapInstanceRef.current = new window.google.maps.Map(mapContainerRef.current, {
-            zoom: 17,
-            center: { lat: 37.3861, lng: -5.9915 },
-            mapTypeControl: true,
-            fullscreenControl: true,
-            zoomControl: true,
-            streetViewControl: false,
-            mapId: "DEMO_MAP_ID",
-          });
-        } else {
-          // Limpiar capas anteriores recreando el mapa en el mismo contenedor
-          mapInstanceRef.current = new window.google.maps.Map(mapContainerRef.current, {
-            zoom: 17,
-            center: { lat: 37.3861, lng: -5.9915 },
-            mapTypeControl: true,
-            fullscreenControl: true,
-            zoomControl: true,
-            streetViewControl: false,
-            mapId: "DEMO_MAP_ID",
-          });
-        }
-
-        const map = mapInstanceRef.current;
-
-        if (mode === "heatmap") {
-          const heatmapData = validPasses.map((p: any) => ({
-            location: new window.google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
-            weight: Math.max(1, Number(p.count) ?? 1),
-          }));
-
-          new (window.google.maps as any).visualization.HeatmapLayer({
-            data: heatmapData,
-            map,
-            radius: 35,
-            opacity: 0.8,
-            gradient: [
-              "rgba(0, 255, 0, 0)",
-              "rgba(0, 255, 0, 1)",
-              "rgba(64, 220, 0, 1)",
-              "rgba(128, 200, 0, 1)",
-              "rgba(180, 180, 0, 1)",
-              "rgba(220, 160, 0, 1)",
-              "rgba(255, 140, 0, 1)",
-              "rgba(255, 100, 0, 1)",
-              "rgba(255, 60, 0, 1)",
-              "rgba(255, 0, 0, 1)",
-            ],
-          });
-        } else {
-          // Marcadores con tamaño proporcional al count
-          validPasses.forEach((p: any) => {
-            const scale = Math.max(8, Math.min(24, 8 + Math.sqrt(Number(p.count) ?? 1) * 2));
-            const marker = new window.google.maps.Marker({
-              position: { lat: Number(p.latitude), lng: Number(p.longitude) },
-              map,
-              title: `${p.count} persona(s) · ${p.directionLabel ?? "Sin sentido"}`,
-              icon: {
-                path: window.google.maps.SymbolPath.CIRCLE,
-                scale,
-                fillColor: "#f59e0b",
-                fillOpacity: 0.85,
-                strokeColor: "#ffffff",
-                strokeWeight: 2,
-              },
-            });
-
-            const infoWindow = new window.google.maps.InfoWindow({
-              content: `
-                <div style="font-family: Inter, sans-serif; padding: 4px; min-width: 180px;">
-                  <p style="font-weight: 600; margin: 0 0 4px 0; font-size: 13px;">${p.count} persona(s)</p>
-                  <p style="margin: 0; font-size: 12px; color: #666;">Punto: ${p.surveyPoint}</p>
-                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Sentido: ${p.directionLabel ?? "—"}</p>
-                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Encuestador: ${p.encuestadorName ?? "—"}</p>
-                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Fecha: ${new Date(p.recordedAt).toLocaleDateString("es-ES")}</p>
-                  <p style="margin: 2px 0; font-size: 12px; color: #666;">Hora: ${new Date(p.recordedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
-                </div>
-              `,
-            });
-
-            marker.addListener("click", () => infoWindow.open(map, marker));
-          });
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setMapError("No se pudo cargar el mapa. Comprueba la conexión.");
-        console.error(err);
-      });
+    mapRef.current = map;
+    markersLayerRef.current = L.layerGroup().addTo(map);
 
     return () => {
-      cancelled = true;
+      map.remove();
+      mapRef.current = null;
+      heatLayerRef.current = null;
+      markersLayerRef.current = null;
     };
+  }, []);
+
+  // Actualizar capas cuando cambian los datos o el modo
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || isLoading) return;
+
+    // Limpiar capa de calor anterior
+    if (heatLayerRef.current) {
+      map.removeLayer(heatLayerRef.current);
+      heatLayerRef.current = null;
+    }
+
+    // Limpiar marcadores anteriores
+    if (markersLayerRef.current) {
+      markersLayerRef.current.clearLayers();
+    }
+
+    if (validPasses.length === 0) return;
+
+    if (mode === "heatmap") {
+      // leaflet.heat: array de [lat, lng, intensity]
+      const maxCount = Math.max(...validPasses.map((p: any) => Number(p.count) || 1));
+      const heatData: [number, number, number][] = validPasses.map((p: any) => [
+        Number(p.latitude),
+        Number(p.longitude),
+        (Number(p.count) || 1) / maxCount, // normalizado 0-1
+      ]);
+
+      heatLayerRef.current = (L as any).heatLayer(heatData, {
+        radius: 25,
+        blur: 20,
+        maxZoom: 17,
+        max: 1.0,
+        gradient: {
+          0.0: "green",
+          0.4: "yellow",
+          0.7: "orange",
+          1.0: "red",
+        },
+      }).addTo(map);
+    } else {
+      // Marcadores con círculos proporcionales al count
+      validPasses.forEach((p: any) => {
+        const count = Number(p.count) || 1;
+        const radius = Math.max(6, Math.min(20, 6 + Math.sqrt(count) * 1.5));
+        const circle = L.circleMarker(
+          [Number(p.latitude), Number(p.longitude)],
+          {
+            radius,
+            fillColor: "#f59e0b",
+            fillOpacity: 0.85,
+            color: "#ffffff",
+            weight: 2,
+          }
+        );
+
+        circle.bindPopup(`
+          <div style="font-family: Inter, sans-serif; min-width: 180px;">
+            <p style="font-weight: 600; margin: 0 0 4px 0; font-size: 13px;">${count} persona(s)</p>
+            <p style="margin: 0; font-size: 12px; color: #666;">Punto: ${p.surveyPoint ?? "—"}</p>
+            <p style="margin: 2px 0; font-size: 12px; color: #666;">Sentido: ${p.directionLabel ?? "—"}</p>
+            <p style="margin: 2px 0; font-size: 12px; color: #666;">Encuestador: ${p.encuestadorName ?? "—"}</p>
+            <p style="margin: 2px 0; font-size: 12px; color: #666;">Fecha: ${new Date(p.recordedAt).toLocaleDateString("es-ES")}</p>
+            <p style="margin: 2px 0; font-size: 12px; color: #666;">Hora: ${new Date(p.recordedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
+          </div>
+        `);
+
+        markersLayerRef.current?.addLayer(circle);
+      });
+    }
   }, [isLoading, validPasses.length, mode, dateFrom, dateTo, surveyPoint]);
 
   return (
@@ -196,9 +172,13 @@ export default function MapaConteos() {
         {/* Header */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Mapa de Calor · Conteos Peatonales</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              Mapa de Calor · Conteos Peatonales
+            </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              {isLoading ? "Cargando..." : `${validPasses.length} pases con GPS · ${totalPersonas.toLocaleString("es-ES")} personas`}
+              {isLoading
+                ? "Cargando..."
+                : `${validPasses.length} pases con GPS · ${totalPersonas.toLocaleString("es-ES")} personas`}
             </p>
           </div>
         </div>
@@ -209,7 +189,9 @@ export default function MapaConteos() {
             <div className="flex flex-wrap items-end gap-4">
               {/* Mode toggle */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-muted-foreground">Visualización</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Visualización
+                </label>
                 <div className="flex rounded-lg border border-border overflow-hidden">
                   <button
                     onClick={() => setMode("heatmap")}
@@ -238,7 +220,9 @@ export default function MapaConteos() {
 
               {/* Punto filter */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-muted-foreground">Punto de conteo</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Punto de conteo
+                </label>
                 <select
                   value={surveyPoint}
                   onChange={(e) => setSurveyPoint(e.target.value)}
@@ -246,14 +230,18 @@ export default function MapaConteos() {
                 >
                   <option value="">Todos los puntos</option>
                   {SURVEY_POINTS.map((p) => (
-                    <option key={p} value={p}>{p}</option>
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {/* Date filters */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-muted-foreground">Desde</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Desde
+                </label>
                 <input
                   type="date"
                   value={dateFrom}
@@ -262,7 +250,9 @@ export default function MapaConteos() {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-muted-foreground">Hasta</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Hasta
+                </label>
                 <input
                   type="date"
                   value={dateTo}
@@ -291,21 +281,16 @@ export default function MapaConteos() {
             {!isLoading && validPasses.length === 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground z-10">
                 <PersonStanding className="h-12 w-12 mb-3 opacity-30" />
-                <p className="text-sm">No hay pases con GPS para el período seleccionado.</p>
-                <p className="text-xs mt-1">Los conteos con GPS capturado aparecerán aquí.</p>
+                <p className="text-sm">
+                  No hay pases con GPS para el período seleccionado.
+                </p>
+                <p className="text-xs mt-1">
+                  Los conteos con GPS capturado aparecerán aquí.
+                </p>
               </div>
             )}
-            {mapError && (
-              <div className="absolute inset-0 flex items-center justify-center text-destructive z-10">
-                <p className="text-sm">{mapError}</p>
-              </div>
-            )}
-            {/* El div del mapa siempre está montado para que el ref funcione */}
-            <div
-              ref={mapContainerRef}
-              className="w-full h-full"
-              style={{ display: (!isLoading && validPasses.length > 0 && !mapError) ? "block" : "none" }}
-            />
+            {/* El div del mapa siempre está montado para que Leaflet funcione */}
+            <div ref={mapContainerRef} className="w-full h-full" />
           </div>
         </Card>
 
@@ -313,8 +298,16 @@ export default function MapaConteos() {
         {!isLoading && validPasses.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "Pases con GPS", value: validPasses.length, color: "text-green-600" },
-              { label: "Total personas", value: totalPersonas.toLocaleString("es-ES"), color: "text-amber-600" },
+              {
+                label: "Pases con GPS",
+                value: validPasses.length,
+                color: "text-green-600",
+              },
+              {
+                label: "Total personas",
+                value: totalPersonas.toLocaleString("es-ES"),
+                color: "text-amber-600",
+              },
               {
                 label: "Media por pase",
                 value: (totalPersonas / validPasses.length).toFixed(1),
@@ -328,8 +321,12 @@ export default function MapaConteos() {
             ].map((stat) => (
               <Card key={stat.label} className="border-0 shadow-sm">
                 <CardContent className="p-4 text-center">
-                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
+                  <p className={`text-2xl font-bold ${stat.color}`}>
+                    {stat.value}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stat.label}
+                  </p>
                 </CardContent>
               </Card>
             ))}

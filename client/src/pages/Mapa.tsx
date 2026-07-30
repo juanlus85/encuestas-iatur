@@ -2,12 +2,17 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { MapView } from "@/components/Map";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import "leaflet.heat";
 import { Loader2, MapPin, Radio, RefreshCw, Thermometer, UserCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ViewMode = "markers" | "heatmap" | "live";
+
+// Centro del Barrio de Santa Cruz, Sevilla
+const CENTER: [number, number] = [37.3861, -5.9915];
 
 // ─── Legend ───────────────────────────────────────────────────────────────────
 function MapLegend({ mode }: { mode: ViewMode }) {
@@ -53,10 +58,8 @@ function MapLegend({ mode }: { mode: ViewMode }) {
 
 // ─── Live Locations Panel ──────────────────────────────────────────────────────
 function LiveLocationsPanel() {
-  const { data: liveData = [], isLoading, refetch, isFetching } = trpc.dashboard.latestLocations.useQuery(
-    undefined,
-    { refetchInterval: 30_000 }
-  );
+  const { data: liveData = [], isLoading, refetch, isFetching } =
+    trpc.dashboard.latestLocations.useQuery(undefined, { refetchInterval: 30_000 });
 
   const formatTime = (ts: any) => {
     if (!ts) return "—";
@@ -85,7 +88,9 @@ function LiveLocationsPanel() {
             Actualizar
           </button>
         </div>
-        <p className="text-xs text-muted-foreground">Última posición GPS registrada por cada encuestador</p>
+        <p className="text-xs text-muted-foreground">
+          Última posición GPS registrada por cada encuestador
+        </p>
       </CardHeader>
       <CardContent>
         {isLoading && (
@@ -97,7 +102,9 @@ function LiveLocationsPanel() {
           <div className="text-center py-6 text-muted-foreground">
             <UserCheck className="h-10 w-10 mx-auto mb-2 opacity-30" />
             <p className="text-sm">No hay localizaciones GPS registradas aún.</p>
-            <p className="text-xs mt-1">Aparecerán aquí cuando los encuestadores inicien encuestas con GPS.</p>
+            <p className="text-xs mt-1">
+              Aparecerán aquí cuando los encuestadores inicien encuestas con GPS.
+            </p>
           </div>
         )}
         <div className="space-y-2">
@@ -110,7 +117,11 @@ function LiveLocationsPanel() {
                 key={loc.encuestadorId}
                 className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 border border-border/50"
               >
-                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isRecent ? "bg-green-500" : "bg-gray-400"}`} />
+                <div
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                    isRecent ? "bg-green-500" : "bg-gray-400"
+                  }`}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-medium text-foreground truncate">
@@ -122,7 +133,10 @@ function LiveLocationsPanel() {
                       </span>
                     )}
                     {isRecent && (
-                      <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50 py-0">
+                      <Badge
+                        variant="outline"
+                        className="text-xs text-green-600 border-green-200 bg-green-50 py-0"
+                      >
                         Activo
                       </Badge>
                     )}
@@ -154,22 +168,25 @@ function LiveLocationsPanel() {
   );
 }
 
-// ─── Live Map ─────────────────────────────────────────────────────────────────
+// ─── Live Map (Google Maps, sin HeatmapLayer) ─────────────────────────────────
 function LiveMapView() {
   const { data: liveData = [], isLoading } = trpc.dashboard.latestLocations.useQuery(
     undefined,
     { refetchInterval: 30_000 }
   );
 
-  const validLive = (liveData as any[]).filter((l) => l.latitude != null && l.longitude != null);
+  const validLive = (liveData as any[]).filter(
+    (l) => l.latitude != null && l.longitude != null
+  );
 
   const handleMapReady = (map: google.maps.Map) => {
-    const center = { lat: 37.3861, lng: -5.9915 };
-    map.setCenter(center);
+    map.setCenter({ lat: 37.3861, lng: -5.9915 });
     map.setZoom(16);
 
     validLive.forEach((loc) => {
-      const diffMins = Math.floor((Date.now() - new Date(loc.lastSeen).getTime()) / 60000);
+      const diffMins = Math.floor(
+        (Date.now() - new Date(loc.lastSeen).getTime()) / 60000
+      );
       const isRecent = diffMins < 30;
       const marker = new google.maps.Marker({
         position: { lat: Number(loc.latitude), lng: Number(loc.longitude) },
@@ -185,7 +202,15 @@ function LiveMapView() {
         },
       });
 
-      const diffText = diffMins < 1 ? "Ahora mismo" : diffMins < 60 ? `Hace ${diffMins} min` : new Date(loc.lastSeen).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+      const diffText =
+        diffMins < 1
+          ? "Ahora mismo"
+          : diffMins < 60
+          ? `Hace ${diffMins} min`
+          : new Date(loc.lastSeen).toLocaleTimeString("es-ES", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
 
       const infoWindow = new google.maps.InfoWindow({
         content: `
@@ -229,9 +254,115 @@ function LiveMapView() {
   );
 }
 
+// ─── Leaflet Map (marcadores + calor) ─────────────────────────────────────────
+function LeafletMapView({
+  mode,
+  validLocations,
+}: {
+  mode: "markers" | "heatmap";
+  validLocations: any[];
+}) {
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const heatLayerRef = useRef<any>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+
+  // Inicializar mapa una sola vez
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current, {
+      center: CENTER,
+      zoom: 16,
+      zoomControl: true,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    mapRef.current = map;
+    markersLayerRef.current = L.layerGroup().addTo(map);
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      heatLayerRef.current = null;
+      markersLayerRef.current = null;
+    };
+  }, []);
+
+  // Actualizar capas cuando cambian datos o modo
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Limpiar capas anteriores
+    if (heatLayerRef.current) {
+      map.removeLayer(heatLayerRef.current);
+      heatLayerRef.current = null;
+    }
+    markersLayerRef.current?.clearLayers();
+
+    if (validLocations.length === 0) return;
+
+    if (mode === "heatmap") {
+      const heatData: [number, number, number][] = validLocations.map((loc) => [
+        Number(loc.latitude),
+        Number(loc.longitude),
+        1,
+      ]);
+
+      heatLayerRef.current = (L as any)
+        .heatLayer(heatData, {
+          radius: 25,
+          blur: 20,
+          maxZoom: 17,
+          gradient: {
+            0.0: "green",
+            0.4: "yellow",
+            0.7: "orange",
+            1.0: "red",
+          },
+        })
+        .addTo(map);
+    } else {
+      validLocations.forEach((loc) => {
+        const isResidente = loc.templateType === "residentes";
+        const circle = L.circleMarker(
+          [Number(loc.latitude), Number(loc.longitude)],
+          {
+            radius: 8,
+            fillColor: isResidente ? "#1e4d8c" : "#d97706",
+            fillOpacity: 0.85,
+            color: "#ffffff",
+            weight: 2,
+          }
+        );
+
+        circle.bindPopup(`
+          <div style="font-family: Inter, sans-serif; min-width: 180px;">
+            <p style="font-weight: 600; margin: 0 0 4px 0; font-size: 13px;">Encuesta #${loc.id}</p>
+            <p style="margin: 0; font-size: 12px; color: #666;">Encuestador: ${loc.encuestadorName ?? "—"}</p>
+            <p style="margin: 2px 0; font-size: 12px; color: #666;">Tipo: ${isResidente ? "Residente" : "Visitante"}</p>
+            <p style="margin: 2px 0; font-size: 12px; color: #666;">Fecha: ${new Date(loc.startedAt).toLocaleDateString("es-ES")}</p>
+            <p style="margin: 2px 0; font-size: 12px; color: #666;">Hora: ${new Date(loc.startedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
+            ${loc.surveyPoint ? `<p style="margin: 2px 0; font-size: 12px; color: #666;">Punto: ${loc.surveyPoint}</p>` : ""}
+          </div>
+        `);
+
+        markersLayerRef.current?.addLayer(circle);
+      });
+    }
+  }, [mode, validLocations]);
+
+  return <div ref={mapContainerRef} className="w-full h-full" />;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Mapa() {
-  const { user } = useAuth();
   const [mode, setMode] = useState<ViewMode>("markers");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -244,66 +375,6 @@ export default function Mapa() {
   const validLocations = (locations as any[]).filter(
     (l) => l.latitude != null && l.longitude != null
   );
-
-  const handleMapReady = (map: google.maps.Map) => {
-    const center = { lat: 37.3861, lng: -5.9915 };
-    map.setCenter(center);
-    map.setZoom(16);
-
-    if (mode === "markers") {
-      validLocations.forEach((loc) => {
-        const isResidente = loc.templateType === "residentes";
-        const marker = new google.maps.Marker({
-          position: { lat: Number(loc.latitude), lng: Number(loc.longitude) },
-          map,
-          title: `#${loc.id} - ${loc.encuestadorName ?? "Encuestador"} (${new Date(loc.startedAt).toLocaleDateString("es-ES")})`,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: isResidente ? "#1e4d8c" : "#d97706",
-            fillOpacity: 0.85,
-            strokeColor: "#ffffff",
-            strokeWeight: 2,
-          },
-        });
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div style="font-family: Inter, sans-serif; padding: 4px; min-width: 180px;">
-              <p style="font-weight: 600; margin: 0 0 4px 0; font-size: 13px;">Encuesta #${loc.id}</p>
-              <p style="margin: 0; font-size: 12px; color: #666;">Encuestador: ${loc.encuestadorName ?? "—"}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Tipo: ${isResidente ? "Residente" : "Visitante"}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Fecha: ${new Date(loc.startedAt).toLocaleDateString("es-ES")}</p>
-              <p style="margin: 2px 0; font-size: 12px; color: #666;">Hora: ${new Date(loc.startedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
-              ${loc.surveyPoint ? `<p style="margin: 2px 0; font-size: 12px; color: #666;">Punto: ${loc.surveyPoint}</p>` : ""}
-            </div>
-          `,
-        });
-        marker.addListener("click", () => infoWindow.open(map, marker));
-      });
-    } else if (mode === "heatmap") {
-      const heatmapData = validLocations.map((loc) =>
-        new google.maps.LatLng(Number(loc.latitude), Number(loc.longitude))
-      );
-      new (google.maps as any).visualization.HeatmapLayer({
-        data: heatmapData,
-        map,
-        radius: 25,
-        opacity: 0.75,
-        gradient: [
-          "rgba(0, 255, 0, 0)",
-          "rgba(0, 255, 0, 1)",
-          "rgba(64, 220, 0, 1)",
-          "rgba(128, 200, 0, 1)",
-          "rgba(180, 180, 0, 1)",
-          "rgba(220, 160, 0, 1)",
-          "rgba(255, 140, 0, 1)",
-          "rgba(255, 100, 0, 1)",
-          "rgba(255, 60, 0, 1)",
-          "rgba(255, 0, 0, 1)",
-        ],
-      });
-    }
-  };
 
   return (
     <DashboardLayout>
@@ -325,21 +396,33 @@ export default function Mapa() {
                 <div className="flex rounded-lg border border-border overflow-hidden">
                   <button
                     onClick={() => setMode("markers")}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${mode === "markers" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"}`}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
+                      mode === "markers"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-foreground hover:bg-muted"
+                    }`}
                   >
                     <MapPin className="h-4 w-4" />
                     Marcadores
                   </button>
                   <button
                     onClick={() => setMode("heatmap")}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${mode === "heatmap" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"}`}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
+                      mode === "heatmap"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-foreground hover:bg-muted"
+                    }`}
                   >
                     <Thermometer className="h-4 w-4" />
                     Calor
                   </button>
                   <button
                     onClick={() => setMode("live")}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${mode === "live" ? "bg-green-600 text-white" : "bg-background text-foreground hover:bg-muted"}`}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
+                      mode === "live"
+                        ? "bg-green-600 text-white"
+                        : "bg-background text-foreground hover:bg-muted"
+                    }`}
                   >
                     <Radio className="h-4 w-4" />
                     En vivo
@@ -389,7 +472,7 @@ export default function Mapa() {
           </>
         )}
 
-        {/* Historical modes */}
+        {/* Historical modes (Leaflet) */}
         {mode !== "live" && (
           <>
             <Card className="border-0 shadow-sm overflow-hidden">
@@ -401,14 +484,18 @@ export default function Mapa() {
                 ) : validLocations.length === 0 ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
                     <MapPin className="h-12 w-12 mb-3 opacity-30" />
-                    <p className="text-sm">No hay ubicaciones GPS registradas para el período seleccionado.</p>
-                    <p className="text-xs mt-1">Las encuestas con GPS capturado aparecerán aquí.</p>
+                    <p className="text-sm">
+                      No hay ubicaciones GPS registradas para el período seleccionado.
+                    </p>
+                    <p className="text-xs mt-1">
+                      Las encuestas con GPS capturado aparecerán aquí.
+                    </p>
                   </div>
                 ) : (
-                  <MapView
+                  <LeafletMapView
                     key={`${mode}-${dateFrom}-${dateTo}`}
-                    onMapReady={handleMapReady}
-                    className="w-full h-full"
+                    mode={mode as "markers" | "heatmap"}
+                    validLocations={validLocations}
                   />
                 )}
               </div>
@@ -418,9 +505,25 @@ export default function Mapa() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { label: "Con GPS", value: validLocations.length, color: "text-green-600" },
-                  { label: "Residentes", value: validLocations.filter((l: any) => l.templateType === "residentes").length, color: "text-blue-600" },
-                  { label: "Visitantes", value: validLocations.filter((l: any) => l.templateType !== "residentes").length, color: "text-amber-600" },
-                  { label: "Encuestadores", value: new Set(validLocations.map((l: any) => l.encuestadorId)).size, color: "text-primary" },
+                  {
+                    label: "Residentes",
+                    value: validLocations.filter(
+                      (l: any) => l.templateType === "residentes"
+                    ).length,
+                    color: "text-blue-600",
+                  },
+                  {
+                    label: "Visitantes",
+                    value: validLocations.filter(
+                      (l: any) => l.templateType !== "residentes"
+                    ).length,
+                    color: "text-amber-600",
+                  },
+                  {
+                    label: "Encuestadores",
+                    value: new Set(validLocations.map((l: any) => l.encuestadorId)).size,
+                    color: "text-primary",
+                  },
                 ].map((stat) => (
                   <Card key={stat.label} className="border-0 shadow-sm">
                     <CardContent className="p-4 text-center">
